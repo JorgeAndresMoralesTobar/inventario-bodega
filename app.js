@@ -2,7 +2,7 @@
 const SUPABASE_URL = "https://apjxqtxxyctytybkkduc.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zHSPfLOo02j4C3SIpxN7oA_m3YdnHcx";
 
-// Usamos supabaseClient para no sobrescribir la propiedad global 'window.supabase'
+// Instancia global de Supabase sin colisión de nombres
 const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 let products = [];
@@ -110,4 +110,118 @@ function renderProducts(filteredList = null) {
         <td class="p-4 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
         <td class="p-4 font-medium text-white">${p.name || ''}</td>
         <td class="p-4">
-          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${stock <= minStock ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${stock <= minStock ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+            ${stock} unidades
+          </span>
+        </td>
+        <td class="p-4">$${Number(p.purchase_price || 0).toLocaleString()}</td>
+        <td class="p-4">$${Number(p.sale_price || 0).toLocaleString()}</td>
+        <td class="p-4">
+          <button onclick="openMovementModalWithProduct(${p.id})" class="text-indigo-400 hover:text-indigo-300 text-xs font-semibold">Mover Stock</button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+function filterProducts() {
+  const query = document.getElementById('search-input').value.toLowerCase();
+  const filtered = products.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  );
+  renderProducts(filtered);
+}
+
+function populateProductSelect() {
+  const select = document.getElementById('mov-product');
+  if (!select) return;
+  select.innerHTML = '';
+  products.forEach(p => {
+    select.innerHTML += `<option value="${p.id}">${p.name} (Stock: ${p.stock})</option>`;
+  });
+}
+
+function openMovementModal() {
+  populateProductSelect();
+  document.getElementById('movement-modal').classList.remove('hidden');
+}
+
+function openMovementModalWithProduct(productId) {
+  openMovementModal();
+  document.getElementById('mov-product').value = productId;
+}
+
+function closeMovementModal() {
+  document.getElementById('movement-modal').classList.add('hidden');
+}
+
+async function saveMovement() {
+  if (!supabaseClient) return;
+  const type = document.getElementById('mov-type').value;
+  const productId = parseInt(document.getElementById('mov-product').value);
+  const qty = parseInt(document.getElementById('mov-qty').value);
+  const comment = document.getElementById('mov-comment').value.trim();
+
+  if (!comment) {
+    alert("⚠️ Debes introducir un comentario u observación obligatoria.");
+    return;
+  }
+
+  const product = products.find(p => p.id === productId);
+  if (!product) return;
+
+  if (type === 'OUT' && product.stock < qty) {
+    alert(`⚠️ Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
+    return;
+  }
+
+  const newStock = type === 'IN' ? product.stock + qty : product.stock - qty;
+
+  const { error: updateError } = await supabaseClient
+    .from('products')
+    .update({ stock: newStock })
+    .eq('id', productId);
+
+  if (updateError) {
+    alert("Error al actualizar stock: " + updateError.message);
+    return;
+  }
+
+  await supabaseClient.from('movements').insert([
+    {
+      type: type,
+      product_name: product.name,
+      qty: qty,
+      comment: comment,
+      user_role: currentRole.toUpperCase()
+    }
+  ]);
+
+  closeMovementModal();
+  document.getElementById('mov-comment').value = '';
+}
+
+function renderMovements() {
+  const tbody = document.getElementById('movements-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  movements.forEach(m => {
+    const formattedDate = new Date(m.created_at).toLocaleString();
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition">
+        <td class="p-4 text-xs text-slate-400">${formattedDate}</td>
+        <td class="p-4">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${m.type === 'IN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+            ${m.type === 'IN' ? 'ENTRADA (+)' : 'SALIDA (-)'}
+          </span>
+        </td>
+        <td class="p-4 font-medium text-white">${m.product_name}</td>
+        <td class="p-4 font-bold">${m.qty}</td>
+        <td class="p-4 text-slate-300 italic">${m.comment}</td>
+        <td class="p-4 text-xs text-indigo-400 font-semibold">${m.user_role}</td>
+      </tr>
+    `;
+  });
+}
