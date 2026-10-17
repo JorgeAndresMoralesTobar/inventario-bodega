@@ -1,14 +1,20 @@
 // --- CONFIGURACIÓN SUPABASE NUBE GLOBAL ---
-const SUPABASE_URL = "https://apjxqtxxyctytybkkduc.supabase.co/rest/v1/";
+// Nota: La URL debe terminar en .supabase.co (SIN /rest/v1/)
+const SUPABASE_URL = "https://apjxqtxxyctytybkkduc.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zHSPfLOo02j4C3SIpxN7oA_m3YdnHcx";
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Inicializar cliente de Supabase asegurando compatibilidad con el CDN
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 let products = [];
 let movements = [];
 let currentRole = 'admin';
 
 document.addEventListener("DOMContentLoaded", async () => {
+  if (!supabase) {
+    console.error("No se pudo cargar el cliente de Supabase.");
+    return;
+  }
   await fetchProducts();
   await fetchMovements();
   applyRolePermissions();
@@ -17,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Sincronización en Tiempo Real para Colombia, España y EE.UU.
 function subscribeRealtime() {
+  if (!supabase) return;
   supabase
     .channel('public:inventory')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
@@ -29,29 +36,37 @@ function subscribeRealtime() {
 }
 
 async function fetchProducts() {
+  if (!supabase) return;
   const { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
   if (!error && data) {
     products = data;
     renderDashboard();
     renderProducts();
     populateProductSelect();
+  } else if (error) {
+    console.error("Error al obtener productos:", error);
   }
 }
 
 async function fetchMovements() {
+  if (!supabase) return;
   const { data, error } = await supabase.from('movements').select('*').order('created_at', { ascending: false });
   if (!error && data) {
     movements = data;
     renderMovements();
+  } else if (error) {
+    console.error("Error al obtener movimientos:", error);
   }
 }
 
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-  document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+  const targetTab = document.getElementById(`tab-${tabName}`);
+  if (targetTab) targetTab.classList.remove('hidden');
 
   document.querySelectorAll('nav button').forEach(el => el.classList.remove('active-nav'));
-  document.getElementById(`nav-${tabName}`).classList.add('active-nav');
+  const targetNav = document.getElementById(`nav-${tabName}`);
+  if (targetNav) targetNav.classList.add('active-nav');
 }
 
 function changeRole(role) {
@@ -61,6 +76,7 @@ function changeRole(role) {
 
 function applyRolePermissions() {
   const btnMovement = document.getElementById('btn-new-movement');
+  if (!btnMovement) return;
   if (currentRole === 'viewer') {
     btnMovement.classList.add('hidden');
   } else {
@@ -70,9 +86,9 @@ function applyRolePermissions() {
 
 function renderDashboard() {
   const totalProducts = products.length;
-  const totalUnits = products.reduce((acc, p) => acc + p.stock, 0);
-  const totalValue = products.reduce((acc, p) => acc + (p.stock * p.purchase_price), 0);
-  const lowStock = products.filter(p => p.stock <= p.min_stock).length;
+  const totalUnits = products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
+  const totalValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
+  const lowStock = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0)).length;
 
   document.getElementById('stat-total-products').innerText = totalProducts;
   document.getElementById('stat-total-units').innerText = totalUnits.toLocaleString();
@@ -84,20 +100,23 @@ function renderDashboard() {
 function renderProducts(filteredList = null) {
   const list = filteredList || products;
   const tbody = document.getElementById('inventory-table-body');
+  if (!tbody) return;
   tbody.innerHTML = '';
 
   list.forEach(p => {
+    const stock = Number(p.stock) || 0;
+    const minStock = Number(p.min_stock) || 0;
     tbody.innerHTML += `
       <tr class="hover:bg-slate-900 transition">
-        <td class="p-4 font-mono text-indigo-400 font-semibold">${p.code}</td>
-        <td class="p-4 font-medium text-white">${p.name}</td>
+        <td class="p-4 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
+        <td class="p-4 font-medium text-white">${p.name || ''}</td>
         <td class="p-4">
-          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${p.stock <= p.min_stock ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
-            ${p.stock} unidades
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${stock <= minStock ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+            ${stock} unidades
           </span>
         </td>
-        <td class="p-4">$${Number(p.purchase_price).toLocaleString()}</td>
-        <td class="p-4">$${Number(p.sale_price).toLocaleString()}</td>
+        <td class="p-4">$${Number(p.purchase_price || 0).toLocaleString()}</td>
+        <td class="p-4">$${Number(p.sale_price || 0).toLocaleString()}</td>
         <td class="p-4">
           <button onclick="openMovementModalWithProduct(${p.id})" class="text-indigo-400 hover:text-indigo-300 text-xs font-semibold">Mover Stock</button>
         </td>
@@ -108,7 +127,10 @@ function renderProducts(filteredList = null) {
 
 function filterProducts() {
   const query = document.getElementById('search-input').value.toLowerCase();
-  const filtered = products.filter(p => p.name.toLowerCase().includes(query) || p.code.toLowerCase().includes(query));
+  const filtered = products.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  );
   renderProducts(filtered);
 }
 
@@ -136,6 +158,7 @@ function closeMovementModal() {
 }
 
 async function saveMovement() {
+  if (!supabase) return;
   const type = document.getElementById('mov-type').value;
   const productId = parseInt(document.getElementById('mov-product').value);
   const qty = parseInt(document.getElementById('mov-qty').value);
@@ -156,7 +179,6 @@ async function saveMovement() {
 
   const newStock = type === 'IN' ? product.stock + qty : product.stock - qty;
 
-  // Actualizar en la base de datos Supabase
   const { error: updateError } = await supabase
     .from('products')
     .update({ stock: newStock })
@@ -167,7 +189,6 @@ async function saveMovement() {
     return;
   }
 
-  // Registrar el historial de movimientos en Supabase
   await supabase.from('movements').insert([
     {
       type: type,
