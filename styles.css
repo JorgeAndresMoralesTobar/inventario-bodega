@@ -1,0 +1,19 @@
+.active-nav {
+  background-color: #1e1b4b;
+  color: #818cf8;
+  border-left: 4px solid #6366f1;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
