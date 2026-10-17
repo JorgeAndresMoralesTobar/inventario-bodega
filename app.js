@@ -1,33 +1,50 @@
-// Carga automática inicial de tus 420 productos extraídos de Inventario_base.xlsx
-const initialProducts = [
-  {"id": 1, "code": "PROD-001", "name": "Nivelador con Tornillo 1/4", "category": "General", "stock": 500, "minStock": 10, "purchasePrice": 540.0, "salePrice": 702.0},
-  {"id": 2, "code": "PROD-002", "name": "Petavos", "category": "General", "stock": 20, "minStock": 10, "purchasePrice": 20000.0, "salePrice": 26000.0},
-  {"id": 3, "code": "PROD-003", "name": "Arreglo Escudos", "category": "General", "stock": 10, "minStock": 10, "purchasePrice": 10000.0, "salePrice": 13000.0},
-  {"id": 4, "code": "PROD-004", "name": "Nivelador con Tornillo 5/16", "category": "General", "stock": 500, "minStock": 10, "purchasePrice": 640.0, "salePrice": 832.0},
-  {"id": 5, "code": "PROD-005", "name": "Nivelador con Tornillo 3/8", "category": "General", "stock": 500, "minStock": 10, "purchasePrice": 700.0, "salePrice": 910.0},
-  {"id": 6, "code": "PROD-006", "name": "Cuña Puerta Grande maciza", "category": "General", "stock": 80, "minStock": 10, "purchasePrice": 1400.0, "salePrice": 1820.0},
-  {"id": 7, "code": "PROD-007", "name": "Sello Oring #2", "category": "General", "stock": 200, "minStock": 10, "purchasePrice": 85.0, "salePrice": 110.5},
-  {"id": 8, "code": "PROD-008", "name": "Sello Oring #3", "category": "General", "stock": 200, "minStock": 10, "purchasePrice": 85.0, "salePrice": 110.5},
-  {"id": 9, "code": "PROD-009", "name": "Sello Oring #4", "category": "General", "stock": 200, "minStock": 10, "purchasePrice": 85.0, "salePrice": 110.5},
-  {"id": 10, "code": "PROD-010", "name": "Sello Oring #5", "category": "General", "stock": 0, "minStock": 10, "purchasePrice": 85.0, "salePrice": 110.5},
-  {"id": 11, "code": "PROD-011", "name": "Sello Oring #6", "category": "General", "stock": 200, "minStock": 10, "purchasePrice": 90.0, "salePrice": 117.0},
-  {"id": 12, "code": "PROD-012", "name": "Sello Oring #7", "category": "General", "stock": 200, "minStock": 10, "purchasePrice": 90.0, "salePrice": 117.0},
-  {"id": 13, "code": "PROD-013", "name": "Sello Oring #8", "category": "General", "stock": 200, "minStock": 10, "purchasePrice": 90.0, "salePrice": 117.0},
-  {"id": 14, "code": "PROD-014", "name": "Sello Oring #9", "category": "General", "stock": 200, "minStock": 10, "purchasePrice": 100.0, "salePrice": 130.0},
-  {"id": 15, "code": "PROD-015", "name": "Sello Oring #10", "category": "General", "stock": 200, "minStock": 10, "purchasePrice": 100.0, "salePrice": 130.0}
-];
+// --- CONFIGURACIÓN SUPABASE NUBE GLOBAL ---
+const SUPABASE_URL = "https://apjxqtxxyctytybkkduc.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "sb_publishable_zHSPfLOo02j4C3SIpxN7oA_m3YdnHcx";
 
-let products = JSON.parse(localStorage.getItem('bodega_products')) || initialProducts;
-let movements = JSON.parse(localStorage.getItem('bodega_movements')) || [];
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let products = [];
+let movements = [];
 let currentRole = 'admin';
 
-document.addEventListener("DOMContentLoaded", () => {
-  renderDashboard();
-  renderProducts();
-  renderMovements();
-  populateProductSelect();
+document.addEventListener("DOMContentLoaded", async () => {
+  await fetchProducts();
+  await fetchMovements();
   applyRolePermissions();
+  subscribeRealtime();
 });
+
+// Sincronización en Tiempo Real para Colombia, España y EE.UU.
+function subscribeRealtime() {
+  supabase
+    .channel('public:inventory')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+      await fetchProducts();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'movements' }, async () => {
+      await fetchMovements();
+    })
+    .subscribe();
+}
+
+async function fetchProducts() {
+  const { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
+  if (!error && data) {
+    products = data;
+    renderDashboard();
+    renderProducts();
+    populateProductSelect();
+  }
+}
+
+async function fetchMovements() {
+  const { data, error } = await supabase.from('movements').select('*').order('created_at', { ascending: false });
+  if (!error && data) {
+    movements = data;
+    renderMovements();
+  }
+}
 
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -54,8 +71,8 @@ function applyRolePermissions() {
 function renderDashboard() {
   const totalProducts = products.length;
   const totalUnits = products.reduce((acc, p) => acc + p.stock, 0);
-  const totalValue = products.reduce((acc, p) => acc + (p.stock * p.purchasePrice), 0);
-  const lowStock = products.filter(p => p.stock <= p.minStock).length;
+  const totalValue = products.reduce((acc, p) => acc + (p.stock * p.purchase_price), 0);
+  const lowStock = products.filter(p => p.stock <= p.min_stock).length;
 
   document.getElementById('stat-total-products').innerText = totalProducts;
   document.getElementById('stat-total-units').innerText = totalUnits.toLocaleString();
@@ -75,12 +92,12 @@ function renderProducts(filteredList = null) {
         <td class="p-4 font-mono text-indigo-400 font-semibold">${p.code}</td>
         <td class="p-4 font-medium text-white">${p.name}</td>
         <td class="p-4">
-          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${p.stock <= p.minStock ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${p.stock <= p.min_stock ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
             ${p.stock} unidades
           </span>
         </td>
-        <td class="p-4">$${p.purchasePrice.toLocaleString()}</td>
-        <td class="p-4">$${p.salePrice.toLocaleString()}</td>
+        <td class="p-4">$${Number(p.purchase_price).toLocaleString()}</td>
+        <td class="p-4">$${Number(p.sale_price).toLocaleString()}</td>
         <td class="p-4">
           <button onclick="openMovementModalWithProduct(${p.id})" class="text-indigo-400 hover:text-indigo-300 text-xs font-semibold">Mover Stock</button>
         </td>
@@ -97,6 +114,7 @@ function filterProducts() {
 
 function populateProductSelect() {
   const select = document.getElementById('mov-product');
+  if (!select) return;
   select.innerHTML = '';
   products.forEach(p => {
     select.innerHTML += `<option value="${p.id}">${p.name} (Stock: ${p.stock})</option>`;
@@ -117,14 +135,14 @@ function closeMovementModal() {
   document.getElementById('movement-modal').classList.add('hidden');
 }
 
-function saveMovement() {
+async function saveMovement() {
   const type = document.getElementById('mov-type').value;
   const productId = parseInt(document.getElementById('mov-product').value);
   const qty = parseInt(document.getElementById('mov-qty').value);
   const comment = document.getElementById('mov-comment').value.trim();
 
   if (!comment) {
-    alert("⚠️ Debes introducir un comentario u observación para registrar el movimiento.");
+    alert("⚠️ Debes introducir un comentario u observación obligatoria.");
     return;
   }
 
@@ -136,53 +154,53 @@ function saveMovement() {
     return;
   }
 
-  // Modificación dinámica del stock
-  if (type === 'IN') {
-    product.stock += qty;
-  } else {
-    product.stock -= qty;
+  const newStock = type === 'IN' ? product.stock + qty : product.stock - qty;
+
+  // Actualizar en la base de datos Supabase
+  const { error: updateError } = await supabase
+    .from('products')
+    .update({ stock: newStock })
+    .eq('id', productId);
+
+  if (updateError) {
+    alert("Error al actualizar stock: " + updateError.message);
+    return;
   }
 
-  // Registro del historial
-  const movement = {
-    id: Date.now(),
-    date: new Date().toLocaleString(),
-    type: type,
-    productName: product.name,
-    qty: qty,
-    comment: comment,
-    user: currentRole.toUpperCase()
-  };
+  // Registrar el historial de movimientos en Supabase
+  await supabase.from('movements').insert([
+    {
+      type: type,
+      product_name: product.name,
+      qty: qty,
+      comment: comment,
+      user_role: currentRole.toUpperCase()
+    }
+  ]);
 
-  movements.unshift(movement);
-
-  localStorage.setItem('bodega_products', JSON.stringify(products));
-  localStorage.setItem('bodega_movements', JSON.stringify(movements));
-
-  renderDashboard();
-  renderProducts();
-  renderMovements();
   closeMovementModal();
   document.getElementById('mov-comment').value = '';
 }
 
 function renderMovements() {
   const tbody = document.getElementById('movements-table-body');
+  if (!tbody) return;
   tbody.innerHTML = '';
 
   movements.forEach(m => {
+    const formattedDate = new Date(m.created_at).toLocaleString();
     tbody.innerHTML += `
       <tr class="hover:bg-slate-900 transition">
-        <td class="p-4 text-xs text-slate-400">${m.date}</td>
+        <td class="p-4 text-xs text-slate-400">${formattedDate}</td>
         <td class="p-4">
           <span class="px-2.5 py-1 rounded-full text-xs font-bold ${m.type === 'IN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
             ${m.type === 'IN' ? 'ENTRADA (+)' : 'SALIDA (-)'}
           </span>
         </td>
-        <td class="p-4 font-medium text-white">${m.productName}</td>
+        <td class="p-4 font-medium text-white">${m.product_name}</td>
         <td class="p-4 font-bold">${m.qty}</td>
         <td class="p-4 text-slate-300 italic">${m.comment}</td>
-        <td class="p-4 text-xs text-indigo-400 font-semibold">${m.user}</td>
+        <td class="p-4 text-xs text-indigo-400 font-semibold">${m.user_role}</td>
       </tr>
     `;
   });
