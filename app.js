@@ -10,7 +10,6 @@ let systemUsers = [];
 let currentUser = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Verificar si hay sesión activa guardada
   const savedUser = localStorage.getItem("inventory_user");
   if (savedUser) {
     currentUser = JSON.parse(savedUser);
@@ -18,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// LOGIN
+// LOGIN Y SESIÓN
 async function handleLogin(e) {
   e.preventDefault();
   const usernameInput = document.getElementById("login-username").value.trim();
@@ -74,14 +73,12 @@ function applyRolePermissions() {
   const btnMovement = document.getElementById("btn-new-movement");
   const navUsers = document.getElementById("nav-users");
 
-  // El botón de entrada/salida solo lo ven Administrador y Operador
   if (currentUser.role === "viewer") {
     if (btnMovement) btnMovement.classList.add("hidden");
   } else {
     if (btnMovement) btnMovement.classList.remove("hidden");
   }
 
-  // La pestaña de usuarios SOLO la ve el Administrador
   if (currentUser.role === "admin") {
     if (navUsers) navUsers.classList.remove("hidden");
   } else {
@@ -103,7 +100,7 @@ function subscribeRealtime() {
     .subscribe();
 }
 
-// FETCH DATA
+// OBTENER DATOS
 async function fetchProducts() {
   if (!supabaseClient) return;
   const { data, error } = await supabaseClient.from("products").select("*").order("id", { ascending: true });
@@ -132,7 +129,7 @@ async function fetchUsers() {
   }
 }
 
-// CREAR USUARIO (Exclusivo Administrador)
+// GESTIÓN DE USUARIOS
 async function handleCreateUser(e) {
   e.preventDefault();
   if (currentUser.role !== 'admin') return;
@@ -144,7 +141,7 @@ async function handleCreateUser(e) {
   const { error } = await supabaseClient.from("app_users").insert([{ username, password, role }]);
 
   if (error) {
-    alert("Error al crear usuario (quizás ya existe ese nombre): " + error.message);
+    alert("Error al crear usuario: " + error.message);
     return;
   }
 
@@ -187,7 +184,7 @@ function renderUsers() {
   });
 }
 
-// NAVEGACIÓN
+// NAVEGACIÓN TAB
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   const targetTab = document.getElementById(`tab-${tabName}`);
@@ -211,6 +208,7 @@ function renderDashboard() {
   document.getElementById('total-count-badge').innerText = totalProducts;
 }
 
+// RENDER TABLA PRODUCTOS CON BOTÓN EDITAR EXCLUSIVO ADMIN
 function renderProducts(filteredList = null) {
   const list = filteredList || products;
   const tbody = document.getElementById('inventory-table-body');
@@ -221,6 +219,7 @@ function renderProducts(filteredList = null) {
     const stock = Number(p.stock) || 0;
     const minStock = Number(p.min_stock) || 0;
     const canMove = currentUser && (currentUser.role === 'admin' || currentUser.role === 'operator');
+    const isAdmin = currentUser && currentUser.role === 'admin';
 
     tbody.innerHTML += `
       <tr class="hover:bg-slate-900 transition">
@@ -233,8 +232,10 @@ function renderProducts(filteredList = null) {
         </td>
         <td class="p-4">$${Number(p.purchase_price || 0).toLocaleString()}</td>
         <td class="p-4">$${Number(p.sale_price || 0).toLocaleString()}</td>
-        <td class="p-4">
-          ${canMove ? `<button onclick="openMovementModalWithProduct(${p.id})" class="text-indigo-400 hover:text-indigo-300 text-xs font-semibold">Mover Stock</button>` : '<span class="text-xs text-slate-600">Solo lectura</span>'}
+        <td class="p-4 flex gap-3">
+          ${canMove ? `<button onclick="openMovementModalWithProduct(${p.id})" class="text-indigo-400 hover:text-indigo-300 text-xs font-semibold">Mover Stock</button>` : ''}
+          ${isAdmin ? `<button onclick="openEditProductModal(${p.id})" class="text-amber-400 hover:text-amber-300 text-xs font-semibold"><i class="fa-solid fa-pen"></i> Editar</button>` : ''}
+          ${!canMove && !isAdmin ? '<span class="text-xs text-slate-600">Solo lectura</span>' : ''}
         </td>
       </tr>
     `;
@@ -250,7 +251,60 @@ function filterProducts() {
   renderProducts(filtered);
 }
 
-// MODAL Y BUSCADOR
+// NUEVAS FUNCIONES: EDICIÓN DE PRODUCTO PARA EL ADMINISTRADOR
+function openEditProductModal(productId) {
+  if (currentUser.role !== 'admin') return;
+
+  const product = products.find(p => p.id === productId);
+  if (!product) return;
+
+  document.getElementById('edit-product-id').value = product.id;
+  document.getElementById('edit-product-name').value = product.name;
+  document.getElementById('edit-product-stock').value = product.stock;
+  document.getElementById('edit-purchase-price').value = product.purchase_price;
+  document.getElementById('edit-sale-price').value = product.sale_price;
+
+  document.getElementById('edit-product-modal').classList.remove('hidden');
+}
+
+function closeEditProductModal() {
+  document.getElementById('edit-product-modal').classList.add('hidden');
+}
+
+async function saveProductEdit() {
+  if (!supabaseClient || currentUser.role !== 'admin') return;
+
+  const productId = parseInt(document.getElementById('edit-product-id').value);
+  const newName = document.getElementById('edit-product-name').value.trim();
+  const newStock = parseInt(document.getElementById('edit-product-stock').value);
+  const newPurchasePrice = parseFloat(document.getElementById('edit-purchase-price').value);
+  const newSalePrice = parseFloat(document.getElementById('edit-sale-price').value);
+
+  if (!newName) {
+    alert("⚠️ El nombre del producto no puede estar vacío.");
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('products')
+    .update({
+      name: newName,
+      stock: newStock,
+      purchase_price: newPurchasePrice,
+      sale_price: newSalePrice
+    })
+    .eq('id', productId);
+
+  if (error) {
+    alert("Error al actualizar producto: " + error.message);
+    return;
+  }
+
+  closeEditProductModal();
+  await fetchProducts();
+}
+
+// BUSCADOR EN EL MODAL DE MOVIMIENTOS
 function populateProductSelect() {
   const searchInput = document.getElementById('mov-product-search');
   const hiddenId = document.getElementById('mov-product-id');

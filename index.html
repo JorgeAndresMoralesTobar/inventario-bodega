@@ -43,7 +43,7 @@
     </div>
   </div>
 
-  <!-- APLICACIÓN PRINCIPAL (Oculta hasta hacer login) -->
+  <!-- APLICACIÓN PRINCIPAL -->
   <div id="app-screen" class="hidden flex min-h-screen">
     
     <!-- Panel Lateral / Sidebar -->
@@ -63,13 +63,19 @@
           <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium active-nav">
             <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
           </button>
-          <button onclick="switchTab('inventory')" id="nav-inventory" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
-            <i class="fa-solid fa-box w-5"></i> Productos (<span id="total-count-badge">0</span>)
+          
+          <!-- CORREGIDO: Productos alineado sin saltos de línea -->
+          <button onclick="switchTab('inventory')" id="nav-inventory" class="w-full flex items-center justify-between px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
+            <div class="flex items-center gap-3 whitespace-nowrap">
+              <i class="fa-solid fa-box w-5"></i> Productos
+            </div>
+            <span class="text-xs font-bold bg-slate-800 text-indigo-400 px-2 py-0.5 rounded-md border border-slate-700" id="total-count-badge">0</span>
           </button>
+
           <button onclick="switchTab('movements')" id="nav-movements" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
             <i class="fa-solid fa-arrow-right-arrow-left w-5"></i> Historial
           </button>
-          <!-- Opción exclusiva para el Administrador -->
+
           <button onclick="switchTab('users')" id="nav-users" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium hidden">
             <i class="fa-solid fa-users-gear w-5"></i> Gestión Usuarios
           </button>
@@ -139,7 +145,7 @@
                 <th class="p-4">Stock Actual</th>
                 <th class="p-4">Precio Compra Un.</th>
                 <th class="p-4">Precio Venta Un.</th>
-                <th class="p-4">Acción</th>
+                <th class="p-4">Acciones</th>
               </tr>
             </thead>
             <tbody id="inventory-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
@@ -166,7 +172,7 @@
         </div>
       </div>
 
-      <!-- Tab 4: Gestión de Usuarios (Exclusivo Admin) -->
+      <!-- Tab 4: Gestión Usuarios (Exclusivo Admin) -->
       <div id="tab-users" class="tab-content hidden space-y-6">
         <div class="flex justify-between items-center">
           <h3 class="text-lg font-bold text-white">Crear Nuevo Usuario</h3>
@@ -212,7 +218,7 @@
     </main>
   </div>
 
-  <!-- Modal para Registrar Movimiento -->
+  <!-- Modal Registrar Movimiento -->
   <div id="movement-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
     <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4 relative">
       <h3 class="text-xl font-bold text-white">Registrar Entrada / Salida</h3>
@@ -225,7 +231,6 @@
         </select>
       </div>
 
-      <!-- Buscador Interactivo -->
       <div class="relative">
         <label class="block text-xs font-semibold text-slate-400 mb-1">PRODUCTO</label>
         <input 
@@ -253,6 +258,40 @@
       <div class="flex gap-3 justify-end pt-2">
         <button onclick="closeMovementModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
         <button onclick="saveMovement()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 shadow-lg shadow-indigo-600/30">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR PRODUCTO (NUEVO: Exclusivo Administrador) -->
+  <div id="edit-product-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
+      <h3 class="text-xl font-bold text-white">Editar Datos del Producto</h3>
+      <input type="hidden" id="edit-product-id">
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE DEL PRODUCTO</label>
+        <input type="text" id="edit-product-name" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">UNIDADES EN STOCK</label>
+        <input type="number" id="edit-product-stock" min="0" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">PRECIO COMPRA</label>
+          <input type="number" step="0.01" id="edit-purchase-price" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">PRECIO VENTA</label>
+          <input type="number" step="0.01" id="edit-sale-price" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+        </div>
+      </div>
+
+      <div class="flex gap-3 justify-end pt-2">
+        <button onclick="closeEditProductModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
+        <button onclick="saveProductEdit()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 shadow-lg shadow-indigo-600/30">Guardar Cambios</button>
       </div>
     </div>
   </div>
