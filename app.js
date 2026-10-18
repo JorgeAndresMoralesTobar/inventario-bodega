@@ -254,19 +254,18 @@ function filterProducts() {
   renderProducts(filtered);
 }
 
-// CREAR NUEVO PRODUCTO (Exclusivo Administrador)
+// CREAR NUEVO PRODUCTO
 function openAddProductModal() {
-  if (currentUser.role !== 'admin') return;
+  if (!currentUser || currentUser.role !== 'admin') return;
   
-  // Sugerir código automático
   const nextNumber = products.length + 1;
   const suggestedCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
   
   document.getElementById('add-product-code').value = suggestedCode;
   document.getElementById('add-product-name').value = '';
   document.getElementById('add-product-stock').value = 0;
-  document.getElementById('add-product-purchase-price').value = 0;
-  document.getElementById('add-product-sale-price').value = 0;
+  document.getElementById('add-purchase-price').value = 0;
+  document.getElementById('add-sale-price').value = 0;
 
   document.getElementById('add-product-modal').classList.remove('hidden');
 }
@@ -289,7 +288,6 @@ async function saveNewProduct() {
     return;
   }
 
-  // Generar ID numérico único incremental
   const newId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
 
   const { error } = await supabaseClient.from('products').insert([
@@ -310,7 +308,6 @@ async function saveNewProduct() {
     return;
   }
 
-  // Registrar el movimiento inicial si ingresó stock mayor a 0
   if (stock > 0) {
     await supabaseClient.from('movements').insert([
       {
@@ -329,7 +326,7 @@ async function saveNewProduct() {
 
 // EDICIÓN DE PRODUCTO EXISTENTE
 function openEditProductModal(productId) {
-  if (currentUser.role !== 'admin') return;
+  if (!currentUser || currentUser.role !== 'admin') return;
 
   const product = products.find(p => p.id === productId);
   if (!product) return;
