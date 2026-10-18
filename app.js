@@ -1,63 +1,193 @@
-// --- CONFIGURACIÓN SUPABASE NUBE GLOBAL ---
+// --- CONFIGURACIÓN SUPABASE ---
 const SUPABASE_URL = "https://apjxqtxxyctytybkkduc.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zHSPfLOo02j4C3SIpxN7oA_m3YdnHcx";
 
-// Instancia global del cliente Supabase
 const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 let products = [];
 let movements = [];
-let currentRole = 'admin';
+let systemUsers = [];
+let currentUser = null;
 
-document.addEventListener("DOMContentLoaded", async () => {
-  if (!supabaseClient) {
-    console.error("No se pudo inicializar Supabase.");
-    return;
+document.addEventListener("DOMContentLoaded", () => {
+  // Verificar si hay sesión activa guardada
+  const savedUser = localStorage.getItem("inventory_user");
+  if (savedUser) {
+    currentUser = JSON.parse(savedUser);
+    showAppScreen();
   }
-  await fetchProducts();
-  await fetchMovements();
-  applyRolePermissions();
-  subscribeRealtime();
 });
 
-// Sincronización en Tiempo Real
+// LOGIN
+async function handleLogin(e) {
+  e.preventDefault();
+  const usernameInput = document.getElementById("login-username").value.trim();
+  const passwordInput = document.getElementById("login-password").value.trim();
+
+  if (!supabaseClient) return;
+
+  const { data, error } = await supabaseClient
+    .from("app_users")
+    .select("*")
+    .eq("username", usernameInput)
+    .eq("password", passwordInput)
+    .single();
+
+  if (error || !data) {
+    alert("⚠️ Usuario o contraseña incorrectos.");
+    return;
+  }
+
+  currentUser = data;
+  localStorage.setItem("inventory_user", JSON.stringify(currentUser));
+  document.getElementById("login-username").value = "";
+  document.getElementById("login-password").value = "";
+  showAppScreen();
+}
+
+function handleLogout() {
+  localStorage.removeItem("inventory_user");
+  currentUser = null;
+  document.getElementById("app-screen").classList.add("hidden");
+  document.getElementById("login-screen").classList.remove("hidden");
+}
+
+async function showAppScreen() {
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("app-screen").classList.remove("hidden");
+
+  document.getElementById("user-display-name").innerText = `@${currentUser.username}`;
+  document.getElementById("user-display-role").innerText = currentUser.role;
+
+  applyRolePermissions();
+  await fetchProducts();
+  await fetchMovements();
+
+  if (currentUser.role === 'admin') {
+    await fetchUsers();
+  }
+
+  subscribeRealtime();
+}
+
+function applyRolePermissions() {
+  const btnMovement = document.getElementById("btn-new-movement");
+  const navUsers = document.getElementById("nav-users");
+
+  // El botón de entrada/salida solo lo ven Administrador y Operador
+  if (currentUser.role === "viewer") {
+    if (btnMovement) btnMovement.classList.add("hidden");
+  } else {
+    if (btnMovement) btnMovement.classList.remove("hidden");
+  }
+
+  // La pestaña de usuarios SOLO la ve el Administrador
+  if (currentUser.role === "admin") {
+    if (navUsers) navUsers.classList.remove("hidden");
+  } else {
+    if (navUsers) navUsers.classList.add("hidden");
+  }
+}
+
+// REALTIME
 function subscribeRealtime() {
   if (!supabaseClient) return;
   supabaseClient
-    .channel('public:inventory')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+    .channel("public:inventory")
+    .on("postgres_changes", { event: "*", schema: "public", table: "products" }, async () => {
       await fetchProducts();
     })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'movements' }, async () => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "movements" }, async () => {
       await fetchMovements();
     })
     .subscribe();
 }
 
+// FETCH DATA
 async function fetchProducts() {
   if (!supabaseClient) return;
-  const { data, error } = await supabaseClient.from('products').select('*').order('id', { ascending: true });
+  const { data, error } = await supabaseClient.from("products").select("*").order("id", { ascending: true });
   if (!error && data) {
     products = data;
     renderDashboard();
     renderProducts();
-    populateProductSelect();
-  } else if (error) {
-    console.error("Error al obtener productos:", error);
   }
 }
 
 async function fetchMovements() {
   if (!supabaseClient) return;
-  const { data, error } = await supabaseClient.from('movements').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabaseClient.from("movements").select("*").order("created_at", { ascending: false });
   if (!error && data) {
     movements = data;
     renderMovements();
-  } else if (error) {
-    console.error("Error al obtener movimientos:", error);
   }
 }
 
+async function fetchUsers() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from("app_users").select("*").order("id", { ascending: true });
+  if (!error && data) {
+    systemUsers = data;
+    renderUsers();
+  }
+}
+
+// CREAR USUARIO (Exclusivo Administrador)
+async function handleCreateUser(e) {
+  e.preventDefault();
+  if (currentUser.role !== 'admin') return;
+
+  const username = document.getElementById("new-username").value.trim();
+  const password = document.getElementById("new-password").value.trim();
+  const role = document.getElementById("new-role").value;
+
+  const { error } = await supabaseClient.from("app_users").insert([{ username, password, role }]);
+
+  if (error) {
+    alert("Error al crear usuario (quizás ya existe ese nombre): " + error.message);
+    return;
+  }
+
+  alert(`✅ Usuario @${username} creado con éxito.`);
+  document.getElementById("new-username").value = "";
+  document.getElementById("new-password").value = "";
+  await fetchUsers();
+}
+
+async function deleteUser(userId) {
+  if (currentUser.role !== 'admin') return;
+  if (!confirm("¿Seguro que deseas eliminar este usuario?")) return;
+
+  const { error } = await supabaseClient.from("app_users").delete().eq("id", userId);
+  if (!error) {
+    await fetchUsers();
+  }
+}
+
+function renderUsers() {
+  const tbody = document.getElementById("users-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  systemUsers.forEach(u => {
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition">
+        <td class="p-4 font-bold text-white">@${u.username}</td>
+        <td class="p-4">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${u.role === 'admin' ? 'bg-indigo-500/20 text-indigo-400' : u.role === 'operator' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-500/20 text-slate-400'}">
+            ${u.role.toUpperCase()}
+          </span>
+        </td>
+        <td class="p-4 text-xs text-slate-400">${new Date(u.created_at).toLocaleDateString()}</td>
+        <td class="p-4">
+          ${u.role !== 'admin' ? `<button onclick="deleteUser(${u.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold">Eliminar</button>` : '<span class="text-xs text-slate-600">Principal</span>'}
+        </td>
+      </tr>
+    `;
+  });
+}
+
+// NAVEGACIÓN
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   const targetTab = document.getElementById(`tab-${tabName}`);
@@ -66,21 +196,6 @@ function switchTab(tabName) {
   document.querySelectorAll('nav button').forEach(el => el.classList.remove('active-nav'));
   const targetNav = document.getElementById(`nav-${tabName}`);
   if (targetNav) targetNav.classList.add('active-nav');
-}
-
-function changeRole(role) {
-  currentRole = role;
-  applyRolePermissions();
-}
-
-function applyRolePermissions() {
-  const btnMovement = document.getElementById('btn-new-movement');
-  if (!btnMovement) return;
-  if (currentRole === 'viewer') {
-    btnMovement.classList.add('hidden');
-  } else {
-    btnMovement.classList.remove('hidden');
-  }
 }
 
 function renderDashboard() {
@@ -105,6 +220,8 @@ function renderProducts(filteredList = null) {
   list.forEach(p => {
     const stock = Number(p.stock) || 0;
     const minStock = Number(p.min_stock) || 0;
+    const canMove = currentUser && (currentUser.role === 'admin' || currentUser.role === 'operator');
+
     tbody.innerHTML += `
       <tr class="hover:bg-slate-900 transition">
         <td class="p-4 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
@@ -117,7 +234,7 @@ function renderProducts(filteredList = null) {
         <td class="p-4">$${Number(p.purchase_price || 0).toLocaleString()}</td>
         <td class="p-4">$${Number(p.sale_price || 0).toLocaleString()}</td>
         <td class="p-4">
-          <button onclick="openMovementModalWithProduct(${p.id})" class="text-indigo-400 hover:text-indigo-300 text-xs font-semibold">Mover Stock</button>
+          ${canMove ? `<button onclick="openMovementModalWithProduct(${p.id})" class="text-indigo-400 hover:text-indigo-300 text-xs font-semibold">Mover Stock</button>` : '<span class="text-xs text-slate-600">Solo lectura</span>'}
         </td>
       </tr>
     `;
@@ -133,8 +250,7 @@ function filterProducts() {
   renderProducts(filtered);
 }
 
-// --- BUSCADOR DINÁMICO EN EL MODAL ---
-
+// MODAL Y BUSCADOR
 function populateProductSelect() {
   const searchInput = document.getElementById('mov-product-search');
   const hiddenId = document.getElementById('mov-product-id');
@@ -191,11 +307,13 @@ function selectModalProduct(id, name, stock) {
 }
 
 function openMovementModal() {
+  if (currentUser.role === 'viewer') return;
   populateProductSelect();
   document.getElementById('movement-modal').classList.remove('hidden');
 }
 
 function openMovementModalWithProduct(productId) {
+  if (currentUser.role === 'viewer') return;
   openMovementModal();
   const product = products.find(p => p.id === productId);
   if (product) {
@@ -210,7 +328,7 @@ function closeMovementModal() {
 }
 
 async function saveMovement() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || currentUser.role === 'viewer') return;
   const type = document.getElementById('mov-type').value;
   const productId = parseInt(document.getElementById('mov-product-id').value);
   const qty = parseInt(document.getElementById('mov-qty').value);
@@ -252,7 +370,7 @@ async function saveMovement() {
       product_name: product.name,
       qty: qty,
       comment: comment,
-      user_role: currentRole.toUpperCase()
+      user_role: currentUser.username.toUpperCase()
     }
   ]);
 
