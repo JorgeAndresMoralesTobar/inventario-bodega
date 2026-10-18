@@ -7,6 +7,7 @@ const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_U
 let products = [];
 let movements = [];
 let systemUsers = [];
+let appRequests = [];
 let currentUser = null;
 let trendChart = null;
 
@@ -62,6 +63,7 @@ async function showAppScreen() {
   applyRolePermissions();
   await fetchProducts();
   await fetchMovements();
+  await fetchRequests();
 
   if (currentUser.role === 'admin') {
     await fetchUsers();
@@ -149,6 +151,9 @@ function subscribeRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "movements" }, async () => {
       await fetchMovements();
     })
+    .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, async () => {
+      await fetchRequests();
+    })
     .subscribe();
 }
 
@@ -182,6 +187,131 @@ async function fetchUsers() {
     systemUsers = data;
     renderUsers();
   }
+}
+
+// MÓDULO DE PETICIONES Y SUGERENCIAS
+async function fetchRequests() {
+  if (!supabaseClient) return;
+  let query = supabaseClient.from("requests").select("*").order("created_at", { ascending: false });
+
+  // Si no es administrador, solo trae sus propias peticiones
+  if (currentUser && currentUser.role !== 'admin') {
+    query = query.eq("username", currentUser.username);
+  }
+
+  const { data, error } = await query;
+  if (!error && data) {
+    appRequests = data;
+    renderRequests();
+  }
+}
+
+async function handleSendRequest(e) {
+  e.preventDefault();
+  const requestInput = document.getElementById("request-input");
+  const text = requestInput.value.trim();
+
+  if (!text) return;
+
+  const { error } = await supabaseClient.from("requests").insert([
+    {
+      username: currentUser.username,
+      request_text: text,
+      status: "En proceso"
+    }
+  ]);
+
+  if (error) {
+    alert("Error al enviar petición: " + error.message);
+    return;
+  }
+
+  alert("✅ Petición enviada correctamente.");
+  requestInput.value = "";
+  await fetchRequests();
+}
+
+async function toggleRequestStatus(requestId, currentStatus) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  const newStatus = currentStatus === 'Hecha' ? 'En proceso' : 'Hecha';
+
+  const { error } = await supabaseClient
+    .from("requests")
+    .update({ status: newStatus })
+    .eq("id", requestId);
+
+  if (error) {
+    alert("Error al actualizar el estado: " + error.message);
+    return;
+  }
+
+  await fetchRequests();
+}
+
+async function deleteRequest(requestId) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  if (!confirm("¿Seguro que deseas eliminar esta petición?")) return;
+
+  const { error } = await supabaseClient
+    .from("requests")
+    .delete()
+    .eq("id", requestId);
+
+  if (error) {
+    alert("Error al eliminar petición: " + error.message);
+    return;
+  }
+
+  await fetchRequests();
+}
+
+function renderRequests() {
+  const tbody = document.getElementById("requests-table-body");
+  const title = document.getElementById("requests-list-title");
+  if (!tbody) return;
+
+  tbody.innerHTML = "";
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  if (title) {
+    title.innerText = isAdmin ? "Todas las Peticiones de los Usuarios" : "Mis Peticiones Enviadas";
+  }
+
+  if (appRequests.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No hay peticiones registradas.</td></tr>`;
+    return;
+  }
+
+  appRequests.forEach(req => {
+    const isDone = req.status === 'Hecha';
+    const dateStr = new Date(req.created_at).toLocaleDateString();
+
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition">
+        <td class="p-4 text-xs text-slate-400">${dateStr}</td>
+        <td class="p-4 font-bold text-white">@${req.username}</td>
+        <td class="p-4 text-slate-200">${req.request_text}</td>
+        <td class="p-4">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${isDone ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}">
+            ${isDone ? '✅ Hecha' : '⏳ En proceso'}
+          </span>
+        </td>
+        <td class="p-4 flex gap-2">
+          ${isAdmin ? `
+            <button onclick="toggleRequestStatus(${req.id}, '${req.status}')" class="px-3 py-1 rounded-lg text-xs font-semibold ${isDone ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}">
+              ${isDone ? 'Marcar En proceso' : 'Marcar Hecha'}
+            </button>
+            <button onclick="deleteRequest(${req.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold p-1">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          ` : '<span class="text-xs text-slate-600">-</span>'}
+        </td>
+      </tr>
+    `;
+  });
 }
 
 // POBLAR SELECTOR DE VALOR INVENTARIO
@@ -236,7 +366,7 @@ function previewLowStockItem() {
   }
 }
 
-// MODAL STOCK BAJO (Botón "Reponer" exclusivo para ADMIN)
+// MODAL STOCK BAJO
 function openLowStockModal() {
   const modal = document.getElementById('low-stock-modal');
   const tbody = document.getElementById('low-stock-modal-body');
@@ -249,7 +379,7 @@ function openLowStockModal() {
   if (lowStockItems.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No hay productos en estado crítico.</td></tr>`;
   } else {
-    const isAdmin = currentUser && currentUser.role === 'admin'; // Exclusivo de administrador
+    const isAdmin = currentUser && currentUser.role === 'admin';
 
     lowStockItems.forEach(p => {
       tbody.innerHTML += `

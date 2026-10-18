@@ -77,6 +77,10 @@
             <i class="fa-solid fa-arrow-right-arrow-left w-5"></i> Historial
           </button>
 
+          <button onclick="switchTab('requests')" id="nav-requests" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
+            <i class="fa-solid fa-comment-dots w-5"></i> Peticiones
+          </button>
+
           <button onclick="switchTab('users')" id="nav-users" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium hidden">
             <i class="fa-solid fa-users-gear w-5"></i> Gestión Usuarios
           </button>
@@ -138,7 +142,7 @@
             <h3 id="stat-total-value" class="text-2xl md:text-3xl font-extrabold text-emerald-400 truncate">$0</h3>
           </div>
 
-          <!-- Tarjeta Alertas Stock Bajo con Desplegable y Modal -->
+          <!-- Tarjeta Alertas Stock Bajo -->
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2">
             <div>
               <div class="flex justify-between items-center">
@@ -219,7 +223,38 @@
         </div>
       </div>
 
-      <!-- Tab 4: Gestión Usuarios -->
+      <!-- TAB 4: PETICIONES Y SUGERENCIAS (NUEVO) -->
+      <div id="tab-requests" class="tab-content hidden space-y-6">
+        <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
+          <h3 class="text-lg font-bold text-white">Enviar Petición o Sugerencia</h3>
+          <form onsubmit="handleSendRequest(event)" class="flex flex-col md:flex-row gap-3">
+            <input type="text" id="request-input" required placeholder="Ej: Me gustaría cambiar el color del panel o agregar exportación a Excel..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-paper-plane"></i> Enviar Petición
+            </button>
+          </form>
+        </div>
+
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+          <div class="p-4 bg-slate-900/50 border-b border-slate-800 flex justify-between items-center">
+            <h4 class="font-bold text-white text-sm" id="requests-list-title">Lista de Peticiones</h4>
+          </div>
+          <table class="w-full text-left text-slate-300">
+            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
+              <tr>
+                <th class="p-4">Fecha</th>
+                <th class="p-4">Usuario</th>
+                <th class="p-4">Detalle de la Petición</th>
+                <th class="p-4">Estado</th>
+                <th class="p-4">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="requests-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab 5: Gestión Usuarios -->
       <div id="tab-users" class="tab-content hidden space-y-6">
         <div class="flex justify-between items-center">
           <h3 class="text-lg font-bold text-white">Crear Nuevo Usuario</h3>
@@ -265,7 +300,7 @@
     </main>
   </div>
 
-  <!-- MODAL PRODUCTOS STOCK BAJO (NUEVO) -->
+  <!-- MODAL PRODUCTOS STOCK BAJO -->
   <div id="low-stock-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
     <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-2xl shadow-2xl space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-3">
