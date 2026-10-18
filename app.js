@@ -72,6 +72,7 @@ async function showAppScreen() {
 function applyRolePermissions() {
   const btnMovement = document.getElementById("btn-new-movement");
   const navUsers = document.getElementById("nav-users");
+  const btnAddProduct = document.getElementById("btn-add-product");
 
   if (currentUser.role === "viewer") {
     if (btnMovement) btnMovement.classList.add("hidden");
@@ -81,8 +82,10 @@ function applyRolePermissions() {
 
   if (currentUser.role === "admin") {
     if (navUsers) navUsers.classList.remove("hidden");
+    if (btnAddProduct) btnAddProduct.classList.remove("hidden");
   } else {
     if (navUsers) navUsers.classList.add("hidden");
+    if (btnAddProduct) btnAddProduct.classList.add("hidden");
   }
 }
 
@@ -208,7 +211,7 @@ function renderDashboard() {
   document.getElementById('total-count-badge').innerText = totalProducts;
 }
 
-// RENDER TABLA PRODUCTOS CON BOTÓN EDITAR EXCLUSIVO ADMIN
+// RENDER TABLA PRODUCTOS
 function renderProducts(filteredList = null) {
   const list = filteredList || products;
   const tbody = document.getElementById('inventory-table-body');
@@ -251,7 +254,80 @@ function filterProducts() {
   renderProducts(filtered);
 }
 
-// NUEVAS FUNCIONES: EDICIÓN DE PRODUCTO PARA EL ADMINISTRADOR
+// CREAR NUEVO PRODUCTO (Exclusivo Administrador)
+function openAddProductModal() {
+  if (currentUser.role !== 'admin') return;
+  
+  // Sugerir código automático
+  const nextNumber = products.length + 1;
+  const suggestedCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
+  
+  document.getElementById('add-product-code').value = suggestedCode;
+  document.getElementById('add-product-name').value = '';
+  document.getElementById('add-product-stock').value = 0;
+  document.getElementById('add-product-purchase-price').value = 0;
+  document.getElementById('add-product-sale-price').value = 0;
+
+  document.getElementById('add-product-modal').classList.remove('hidden');
+}
+
+function closeAddProductModal() {
+  document.getElementById('add-product-modal').classList.add('hidden');
+}
+
+async function saveNewProduct() {
+  if (!supabaseClient || currentUser.role !== 'admin') return;
+
+  const code = document.getElementById('add-product-code').value.trim();
+  const name = document.getElementById('add-product-name').value.trim();
+  const stock = parseInt(document.getElementById('add-product-stock').value) || 0;
+  const purchasePrice = parseFloat(document.getElementById('add-purchase-price').value) || 0;
+  const salePrice = parseFloat(document.getElementById('add-sale-price').value) || 0;
+
+  if (!name) {
+    alert("⚠️ Debes asignar un nombre al nuevo producto.");
+    return;
+  }
+
+  // Generar ID numérico único incremental
+  const newId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+
+  const { error } = await supabaseClient.from('products').insert([
+    {
+      id: newId,
+      code: code || `PROD-${newId}`,
+      name: name,
+      category: 'General',
+      stock: stock,
+      min_stock: 5,
+      purchase_price: purchasePrice,
+      sale_price: salePrice
+    }
+  ]);
+
+  if (error) {
+    alert("Error al guardar el nuevo producto: " + error.message);
+    return;
+  }
+
+  // Registrar el movimiento inicial si ingresó stock mayor a 0
+  if (stock > 0) {
+    await supabaseClient.from('movements').insert([
+      {
+        type: 'IN',
+        product_name: name,
+        qty: stock,
+        comment: 'Alta inicial de nuevo producto',
+        user_role: currentUser.username.toUpperCase()
+      }
+    ]);
+  }
+
+  closeAddProductModal();
+  await fetchProducts();
+}
+
+// EDICIÓN DE PRODUCTO EXISTENTE
 function openEditProductModal(productId) {
   if (currentUser.role !== 'admin') return;
 
