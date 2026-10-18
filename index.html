@@ -81,15 +81,20 @@
         </nav>
       </div>
 
-      <!-- Perfil de usuario y Logout -->
+      <!-- Perfil de usuario y Opciones de Sesión/Contraseña -->
       <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
         <div>
           <p id="user-display-name" class="text-sm font-bold text-white"></p>
           <p id="user-display-role" class="text-xs text-indigo-400 font-semibold uppercase"></p>
         </div>
-        <button onclick="handleLogout()" title="Cerrar Sesión" class="text-slate-400 hover:text-rose-400 transition p-2">
-          <i class="fa-solid fa-right-from-bracket text-lg"></i>
-        </button>
+        <div class="flex items-center gap-1">
+          <button onclick="openChangePasswordModal()" title="Cambiar Contraseña" class="text-slate-400 hover:text-amber-400 transition p-2">
+            <i class="fa-solid fa-key text-base"></i>
+          </button>
+          <button onclick="handleLogout()" title="Cerrar Sesión" class="text-slate-400 hover:text-rose-400 transition p-2">
+            <i class="fa-solid fa-right-from-bracket text-base"></i>
+          </button>
+        </div>
       </div>
     </aside>
 
@@ -135,7 +140,6 @@
         <div class="flex flex-col md:flex-row justify-between items-center gap-4">
           <input type="text" id="search-input" onkeyup="filterProducts()" placeholder="🔍 Buscar producto por nombre o código..." class="w-full md:w-96 bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500">
           
-          <!-- Botón Añadir Producto (Exclusivo Admin) -->
           <button onclick="openAddProductModal()" id="btn-add-product" class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition hidden">
             <i class="fa-solid fa-square-plus"></i> Añadir Nuevo Producto
           </button>
@@ -335,6 +339,33 @@
       <div class="flex gap-3 justify-end pt-2">
         <button onclick="closeAddProductModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
         <button onclick="saveNewProduct()" class="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 shadow-lg shadow-emerald-600/30">Crear Producto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CAMBIAR CONTRASEÑA (NUEVO: Para todos los usuarios) -->
+  <div id="change-password-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
+      <h3 class="text-xl font-bold text-white">Cambiar mi Contraseña</h3>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">CONTRASEÑA ACTUAL</label>
+        <input type="password" id="pass-current" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">NUEVA CONTRASEÑA</label>
+        <input type="password" id="pass-new" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">CONFIRMAR NUEVA CONTRASEÑA</label>
+        <input type="password" id="pass-confirm" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div class="flex gap-3 justify-end pt-2">
+        <button onclick="closeChangePasswordModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
+        <button onclick="saveNewPassword()" class="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-500 shadow-lg shadow-amber-600/30">Actualizar Contraseña</button>
       </div>
     </div>
   </div>

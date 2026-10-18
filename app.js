@@ -89,6 +89,54 @@ function applyRolePermissions() {
   }
 }
 
+// CAMBIO DE CONTRASEÑA PARA CUALQUIER USUARIO
+function openChangePasswordModal() {
+  document.getElementById("pass-current").value = "";
+  document.getElementById("pass-new").value = "";
+  document.getElementById("pass-confirm").value = "";
+  document.getElementById("change-password-modal").classList.remove("hidden");
+}
+
+function closeChangePasswordModal() {
+  document.getElementById("change-password-modal").classList.add("hidden");
+}
+
+async function saveNewPassword() {
+  const currentPass = document.getElementById("pass-current").value.trim();
+  const newPass = document.getElementById("pass-new").value.trim();
+  const confirmPass = document.getElementById("pass-confirm").value.trim();
+
+  if (currentPass !== currentUser.password) {
+    alert("⚠️ La contraseña actual no es correcta.");
+    return;
+  }
+
+  if (!newPass) {
+    alert("⚠️ La nueva contraseña no puede estar vacía.");
+    return;
+  }
+
+  if (newPass !== confirmPass) {
+    alert("⚠️ Las nuevas contraseñas no coinciden.");
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from("app_users")
+    .update({ password: newPass })
+    .eq("id", currentUser.id);
+
+  if (error) {
+    alert("Error al actualizar la contraseña: " + error.message);
+    return;
+  }
+
+  currentUser.password = newPass;
+  localStorage.setItem("inventory_user", JSON.stringify(currentUser));
+  alert("✅ ¡Contraseña actualizada con éxito!");
+  closeChangePasswordModal();
+}
+
 // REALTIME
 function subscribeRealtime() {
   if (!supabaseClient) return;
