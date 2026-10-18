@@ -89,7 +89,7 @@ function applyRolePermissions() {
   }
 }
 
-// CAMBIO DE CONTRASEÑA PARA CUALQUIER USUARIO
+// CAMBIO DE CONTRASEÑA
 function openChangePasswordModal() {
   document.getElementById("pass-current").value = "";
   document.getElementById("pass-new").value = "";
@@ -178,6 +178,27 @@ async function fetchUsers() {
     systemUsers = data;
     renderUsers();
   }
+}
+
+// ELIMINAR FILA DE HISTORIAL (Exclusivo Administrador)
+async function deleteMovement(movementId) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  if (!confirm("¿Seguro que deseas eliminar este registro del historial?")) {
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('movements')
+    .delete()
+    .eq('id', movementId);
+
+  if (error) {
+    alert("Error al borrar el registro del historial: " + error.message);
+    return;
+  }
+
+  await fetchMovements();
 }
 
 // GESTIÓN DE USUARIOS
@@ -558,6 +579,8 @@ function renderMovements() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
   movements.forEach(m => {
     const formattedDate = new Date(m.created_at).toLocaleString();
     tbody.innerHTML += `
@@ -572,6 +595,9 @@ function renderMovements() {
         <td class="p-4 font-bold">${m.qty}</td>
         <td class="p-4 text-slate-300 italic">${m.comment}</td>
         <td class="p-4 text-xs text-indigo-400 font-semibold">${m.user_role}</td>
+        <td class="p-4">
+          ${isAdmin ? `<button onclick="deleteMovement(${m.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash mr-1"></i> Borrar</button>` : '<span class="text-xs text-slate-600">-</span>'}
+        </td>
       </tr>
     `;
   });
