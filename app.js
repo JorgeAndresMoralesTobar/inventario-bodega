@@ -8,6 +8,7 @@ let products = [];
 let movements = [];
 let systemUsers = [];
 let currentUser = null;
+let trendChart = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   const savedUser = localStorage.getItem("inventory_user");
@@ -168,6 +169,7 @@ async function fetchMovements() {
   if (!error && data) {
     movements = data;
     renderMovements();
+    renderChart();
   }
 }
 
@@ -180,7 +182,7 @@ async function fetchUsers() {
   }
 }
 
-// ELIMINAR FILA DE HISTORIAL (Exclusivo Administrador)
+// ELIMINAR REGISTRO DE HISTORIAL
 async function deleteMovement(movementId) {
   if (!currentUser || currentUser.role !== 'admin') return;
 
@@ -278,6 +280,86 @@ function renderDashboard() {
   document.getElementById('stat-total-value').innerText = "$" + totalValue.toLocaleString();
   document.getElementById('stat-low-stock').innerText = lowStock;
   document.getElementById('total-count-badge').innerText = totalProducts;
+
+  renderChart();
+}
+
+// RENDER DEL GRÁFICO DE EVOLUCIÓN CON INTERVALOS SEMANALES
+function renderChart() {
+  const canvas = document.getElementById('valueTrendChart');
+  if (!canvas) return;
+
+  const currentValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
+
+  // Fecha actual y proyección de 4 semanas
+  const now = new Date();
+  const labels = ["Hoy (" + now.toLocaleDateString() + ")"];
+  const values = [currentValue];
+
+  for (let i = 1; i <= 4; i++) {
+    const futureDate = new Date();
+    futureDate.setDate(now.getDate() + (i * 7));
+    labels.push("Semana " + i + " (" + futureDate.toLocaleDateString() + ")");
+    values.push(currentValue); // Se irá actualizando dinámicamente con los movimientos
+  }
+
+  if (trendChart) {
+    trendChart.destroy();
+  }
+
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+  gradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+  gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Valor Inventario ($)',
+        data: values,
+        borderColor: '#10b981',
+        borderWidth: 3,
+        fill: true,
+        backgroundColor: gradient,
+        tension: 0.4,
+        pointBackgroundColor: '#10b981',
+        pointRadius: 5,
+        pointHoverRadius: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ' Valor: $' + context.raw.toLocaleString();
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#94a3b8', font: { size: 11 } }
+        },
+        y: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: {
+            color: '#94a3b8',
+            font: { size: 11 },
+            callback: function(val) {
+              return '$' + val.toLocaleString();
+            }
+          }
+        }
+      }
+    }
+  });
 }
 
 // RENDER TABLA PRODUCTOS

@@ -12,6 +12,8 @@
 
   <!-- SDK oficial de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Chart.js para gráficos interactivos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen">
 
@@ -113,7 +115,7 @@
         </div>
       </header>
 
-      <!-- Tab 1: Dashboard -->
+      <!-- Tab 1: Dashboard con Gráfico Integrado -->
       <div id="tab-dashboard" class="tab-content space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
@@ -131,6 +133,22 @@
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
             <p class="text-slate-400 text-sm font-medium">Alertas Stock Bajo</p>
             <h3 id="stat-low-stock" class="text-3xl font-extrabold text-rose-500 mt-1">0</h3>
+          </div>
+        </div>
+
+        <!-- GRÁFICO DE EVOLUCIÓN -->
+        <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h3 class="text-lg font-bold text-white">Evolución del Valor del Inventario</h3>
+              <p class="text-xs text-slate-400">Proyección y seguimiento continuo por semanas</p>
+            </div>
+            <span class="text-xs bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-full border border-indigo-500/20 font-semibold">
+              <i class="fa-solid fa-chart-line mr-1"></i> Tiempo Real
+            </span>
+          </div>
+          <div class="relative w-full h-72">
+            <canvas id="valueTrendChart"></canvas>
           </div>
         </div>
       </div>
@@ -162,7 +180,7 @@
         </div>
       </div>
 
-      <!-- Tab 3: Historial (Con columna de Acción para Borrar) -->
+      <!-- Tab 3: Historial -->
       <div id="tab-movements" class="tab-content hidden space-y-6">
         <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
           <table class="w-full text-left text-slate-300">
@@ -182,7 +200,7 @@
         </div>
       </div>
 
-      <!-- Tab 4: Gestión Usuarios (Exclusivo Admin) -->
+      <!-- Tab 4: Gestión Usuarios -->
       <div id="tab-users" class="tab-content hidden space-y-6">
         <div class="flex justify-between items-center">
           <h3 class="text-lg font-bold text-white">Crear Nuevo Usuario</h3>
