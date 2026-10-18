@@ -2,7 +2,7 @@
 const SUPABASE_URL = "https://apjxqtxxyctytybkkduc.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zHSPfLOo02j4C3SIpxN7oA_m3YdnHcx";
 
-// Instancia global de Supabase sin colisión de nombres
+// Instancia global del cliente Supabase
 const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 let products = [];
@@ -133,13 +133,61 @@ function filterProducts() {
   renderProducts(filtered);
 }
 
+// --- BUSCADOR DINÁMICO EN EL MODAL ---
+
 function populateProductSelect() {
-  const select = document.getElementById('mov-product');
-  if (!select) return;
-  select.innerHTML = '';
-  products.forEach(p => {
-    select.innerHTML += `<option value="${p.id}">${p.name} (Stock: ${p.stock})</option>`;
-  });
+  const searchInput = document.getElementById('mov-product-search');
+  const hiddenId = document.getElementById('mov-product-id');
+  const resultsDiv = document.getElementById('mov-product-results');
+
+  if (searchInput) searchInput.value = '';
+  if (hiddenId) hiddenId.value = '';
+  if (resultsDiv) {
+    resultsDiv.classList.add('hidden');
+    resultsDiv.innerHTML = '';
+  }
+}
+
+function filterModalProducts() {
+  const searchInput = document.getElementById('mov-product-search');
+  const hiddenId = document.getElementById('mov-product-id');
+  const resultsDiv = document.getElementById('mov-product-results');
+  const query = searchInput.value.toLowerCase().trim();
+
+  hiddenId.value = '';
+
+  if (!query) {
+    resultsDiv.classList.add('hidden');
+    resultsDiv.innerHTML = '';
+    return;
+  }
+
+  const filtered = products.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  );
+
+  if (filtered.length === 0) {
+    resultsDiv.innerHTML = `<div class="p-3 text-xs text-slate-500 text-center">No se encontraron productos</div>`;
+  } else {
+    resultsDiv.innerHTML = filtered.map(p => `
+      <div 
+        onclick="selectModalProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.stock})"
+        class="p-3 text-sm text-slate-200 hover:bg-indigo-600 hover:text-white cursor-pointer transition flex justify-between items-center"
+      >
+        <span><strong>${p.code || ''}</strong> - ${p.name}</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300">Stock: ${p.stock}</span>
+      </div>
+    `).join('');
+  }
+
+  resultsDiv.classList.remove('hidden');
+}
+
+function selectModalProduct(id, name, stock) {
+  document.getElementById('mov-product-search').value = `${name} (Stock: ${stock})`;
+  document.getElementById('mov-product-id').value = id;
+  document.getElementById('mov-product-results').classList.add('hidden');
 }
 
 function openMovementModal() {
@@ -149,19 +197,29 @@ function openMovementModal() {
 
 function openMovementModalWithProduct(productId) {
   openMovementModal();
-  document.getElementById('mov-product').value = productId;
+  const product = products.find(p => p.id === productId);
+  if (product) {
+    selectModalProduct(product.id, product.name, product.stock);
+  }
 }
 
 function closeMovementModal() {
   document.getElementById('movement-modal').classList.add('hidden');
+  const resultsDiv = document.getElementById('mov-product-results');
+  if (resultsDiv) resultsDiv.classList.add('hidden');
 }
 
 async function saveMovement() {
   if (!supabaseClient) return;
   const type = document.getElementById('mov-type').value;
-  const productId = parseInt(document.getElementById('mov-product').value);
+  const productId = parseInt(document.getElementById('mov-product-id').value);
   const qty = parseInt(document.getElementById('mov-qty').value);
   const comment = document.getElementById('mov-comment').value.trim();
+
+  if (!productId) {
+    alert("⚠️ Debes buscar y seleccionar un producto de la lista.");
+    return;
+  }
 
   if (!comment) {
     alert("⚠️ Debes introducir un comentario u observación obligatoria.");
