@@ -115,7 +115,7 @@
         </div>
       </header>
 
-      <!-- Tab 1: Dashboard con Gráfico Integrado -->
+      <!-- Tab 1: Dashboard con Tarjetas y Gráfico -->
       <div id="tab-dashboard" class="tab-content space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
@@ -126,10 +126,20 @@
             <p class="text-slate-400 text-sm font-medium">Unidades en Stock</p>
             <h3 id="stat-total-units" class="text-3xl font-extrabold text-indigo-400 mt-1">0</h3>
           </div>
-          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-            <p class="text-slate-400 text-sm font-medium">Valor Total Inventario</p>
-            <h3 id="stat-total-value" class="text-3xl font-extrabold text-emerald-400 mt-1">$0</h3>
+          
+          <!-- Tarjeta Valor Inventario con Filtro por Producto -->
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2">
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <p class="text-slate-400 text-sm font-medium">Valor Inventario</p>
+              </div>
+              <select id="select-product-filter" onchange="updateProductValueFilter()" class="w-full bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg p-1.5 focus:outline-none focus:border-emerald-500 font-medium truncate">
+                <option value="all">📦 Todos los productos (Total)</option>
+              </select>
+            </div>
+            <h3 id="stat-total-value" class="text-2xl md:text-3xl font-extrabold text-emerald-400 truncate">$0</h3>
           </div>
+
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
             <p class="text-slate-400 text-sm font-medium">Alertas Stock Bajo</p>
             <h3 id="stat-low-stock" class="text-3xl font-extrabold text-rose-500 mt-1">0</h3>
@@ -140,8 +150,8 @@
         <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
           <div class="flex justify-between items-center mb-4">
             <div>
-              <h3 class="text-lg font-bold text-white">Evolución del Valor del Inventario</h3>
-              <p class="text-xs text-slate-400">Proyección y seguimiento continuo por semanas</p>
+              <h3 id="chart-title" class="text-lg font-bold text-white">Evolución del Valor del Inventario</h3>
+              <p class="text-xs text-slate-400">Proyección y seguimiento por semanas</p>
             </div>
             <span class="text-xs bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-full border border-indigo-500/20 font-semibold">
               <i class="fa-solid fa-chart-line mr-1"></i> Tiempo Real

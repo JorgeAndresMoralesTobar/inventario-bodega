@@ -158,6 +158,7 @@ async function fetchProducts() {
   const { data, error } = await supabaseClient.from("products").select("*").order("id", { ascending: true });
   if (!error && data) {
     products = data;
+    populateProductSelectOptions();
     renderDashboard();
     renderProducts();
   }
@@ -180,6 +181,46 @@ async function fetchUsers() {
     systemUsers = data;
     renderUsers();
   }
+}
+
+// POBLAR SELECTOR DE PRODUCTOS EN LA TARJETA DEL DASHBOARD
+function populateProductSelectOptions() {
+  const select = document.getElementById('select-product-filter');
+  if (!select) return;
+
+  const currentSelection = select.value;
+  select.innerHTML = '<option value="all">📦 Todos los productos (Total)</option>';
+
+  products.forEach(p => {
+    select.innerHTML += `<option value="${p.id}">${p.code ? p.code + ' - ' : ''}${p.name}</option>`;
+  });
+
+  if (currentSelection) {
+    select.value = currentSelection;
+  }
+}
+
+// ACTUALIZAR FILTRO POR PRODUCTO SELECCIONADO
+function updateProductValueFilter() {
+  const select = document.getElementById('select-product-filter');
+  const selectedId = select.value;
+  const chartTitle = document.getElementById('chart-title');
+
+  let displayValue = 0;
+
+  if (selectedId === 'all') {
+    displayValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
+    if (chartTitle) chartTitle.innerText = "Evolución del Valor del Inventario (Total)";
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) {
+      displayValue = (Number(p.stock) || 0) * (Number(p.purchase_price) || 0);
+      if (chartTitle) chartTitle.innerText = `Evolución del Valor: ${p.name}`;
+    }
+  }
+
+  document.getElementById('stat-total-value').innerText = "$" + displayValue.toLocaleString();
+  renderChart();
 }
 
 // ELIMINAR REGISTRO DE HISTORIAL
@@ -272,26 +313,32 @@ function switchTab(tabName) {
 function renderDashboard() {
   const totalProducts = products.length;
   const totalUnits = products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
-  const totalValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
   const lowStock = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0)).length;
 
   document.getElementById('stat-total-products').innerText = totalProducts;
   document.getElementById('stat-total-units').innerText = totalUnits.toLocaleString();
-  document.getElementById('stat-total-value').innerText = "$" + totalValue.toLocaleString();
   document.getElementById('stat-low-stock').innerText = lowStock;
   document.getElementById('total-count-badge').innerText = totalProducts;
 
-  renderChart();
+  updateProductValueFilter();
 }
 
-// RENDER DEL GRÁFICO DE EVOLUCIÓN CON INTERVALOS SEMANALES
+// RENDER DEL GRÁFICO DE EVOLUCIÓN
 function renderChart() {
   const canvas = document.getElementById('valueTrendChart');
   if (!canvas) return;
 
-  const currentValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
+  const select = document.getElementById('select-product-filter');
+  const selectedId = select ? select.value : 'all';
 
-  // Fecha actual y proyección de 4 semanas
+  let currentValue = 0;
+  if (selectedId === 'all') {
+    currentValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) currentValue = (Number(p.stock) || 0) * (Number(p.purchase_price) || 0);
+  }
+
   const now = new Date();
   const labels = ["Hoy (" + now.toLocaleDateString() + ")"];
   const values = [currentValue];
@@ -300,7 +347,7 @@ function renderChart() {
     const futureDate = new Date();
     futureDate.setDate(now.getDate() + (i * 7));
     labels.push("Semana " + i + " (" + futureDate.toLocaleDateString() + ")");
-    values.push(currentValue); // Se irá actualizando dinámicamente con los movimientos
+    values.push(currentValue);
   }
 
   if (trendChart) {
@@ -317,7 +364,7 @@ function renderChart() {
     data: {
       labels: labels,
       datasets: [{
-        label: 'Valor Inventario ($)',
+        label: 'Valor ($)',
         data: values,
         borderColor: '#10b981',
         borderWidth: 3,
