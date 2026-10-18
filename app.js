@@ -236,6 +236,7 @@ function previewLowStockItem() {
   }
 }
 
+// MODAL STOCK BAJO (Botón "Reponer" exclusivo para ADMIN)
 function openLowStockModal() {
   const modal = document.getElementById('low-stock-modal');
   const tbody = document.getElementById('low-stock-modal-body');
@@ -248,8 +249,9 @@ function openLowStockModal() {
   if (lowStockItems.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No hay productos en estado crítico.</td></tr>`;
   } else {
+    const isAdmin = currentUser && currentUser.role === 'admin'; // Exclusivo de administrador
+
     lowStockItems.forEach(p => {
-      const canMove = currentUser && (currentUser.role === 'admin' || currentUser.role === 'operator');
       tbody.innerHTML += `
         <tr class="hover:bg-slate-900 transition">
           <td class="p-3 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
@@ -257,7 +259,7 @@ function openLowStockModal() {
           <td class="p-3 text-rose-400 font-bold">${p.stock} un.</td>
           <td class="p-3 text-slate-400">${p.min_stock || 5} un.</td>
           <td class="p-3">
-            ${canMove ? `<button onclick="closeLowStockModal(); openMovementModalWithProduct(${p.id});" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-lg text-xs font-semibold">Reponer</button>` : '<span class="text-xs text-slate-600">-</span>'}
+            ${isAdmin ? `<button onclick="closeLowStockModal(); openMovementModalWithProduct(${p.id});" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-lg text-xs font-semibold">Reponer</button>` : '<span class="text-xs text-slate-600">-</span>'}
           </td>
         </tr>
       `;
