@@ -159,6 +159,7 @@ async function fetchProducts() {
   if (!error && data) {
     products = data;
     populateProductSelectOptions();
+    populateLowStockSelectOptions();
     renderDashboard();
     renderProducts();
   }
@@ -183,7 +184,7 @@ async function fetchUsers() {
   }
 }
 
-// POBLAR SELECTOR DE PRODUCTOS EN LA TARJETA DEL DASHBOARD
+// POBLAR SELECTOR DE VALOR INVENTARIO
 function populateProductSelectOptions() {
   const select = document.getElementById('select-product-filter');
   if (!select) return;
@@ -198,6 +199,76 @@ function populateProductSelectOptions() {
   if (currentSelection) {
     select.value = currentSelection;
   }
+}
+
+// POBLAR SELECTOR DE STOCK BAJO
+function populateLowStockSelectOptions() {
+  const select = document.getElementById('select-low-stock-filter');
+  if (!select) return;
+
+  const currentSelection = select.value;
+  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0));
+
+  select.innerHTML = `<option value="all">⚠️ Mostrar todos los críticos (${lowStockItems.length})</option>`;
+
+  lowStockItems.forEach(p => {
+    select.innerHTML += `<option value="${p.id}">${p.name} (Stock: ${p.stock})</option>`;
+  });
+
+  if (currentSelection) {
+    select.value = currentSelection;
+  }
+}
+
+function previewLowStockItem() {
+  const select = document.getElementById('select-low-stock-filter');
+  const statLowStock = document.getElementById('stat-low-stock');
+  const selectedId = select.value;
+
+  if (selectedId === 'all') {
+    const totalLow = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0)).length;
+    statLowStock.innerText = totalLow;
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) {
+      statLowStock.innerText = `${p.stock} un.`;
+    }
+  }
+}
+
+function openLowStockModal() {
+  const modal = document.getElementById('low-stock-modal');
+  const tbody = document.getElementById('low-stock-modal-body');
+  if (!modal || !tbody) return;
+
+  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0));
+
+  tbody.innerHTML = '';
+
+  if (lowStockItems.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No hay productos en estado crítico.</td></tr>`;
+  } else {
+    lowStockItems.forEach(p => {
+      const canMove = currentUser && (currentUser.role === 'admin' || currentUser.role === 'operator');
+      tbody.innerHTML += `
+        <tr class="hover:bg-slate-900 transition">
+          <td class="p-3 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
+          <td class="p-3 font-medium text-white">${p.name}</td>
+          <td class="p-3 text-rose-400 font-bold">${p.stock} un.</td>
+          <td class="p-3 text-slate-400">${p.min_stock || 5} un.</td>
+          <td class="p-3">
+            ${canMove ? `<button onclick="closeLowStockModal(); openMovementModalWithProduct(${p.id});" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-lg text-xs font-semibold">Reponer</button>` : '<span class="text-xs text-slate-600">-</span>'}
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeLowStockModal() {
+  document.getElementById('low-stock-modal').classList.add('hidden');
 }
 
 // ACTUALIZAR FILTRO POR PRODUCTO SELECCIONADO
@@ -321,6 +392,7 @@ function renderDashboard() {
   document.getElementById('total-count-badge').innerText = totalProducts;
 
   updateProductValueFilter();
+  previewLowStockItem();
 }
 
 // RENDER DEL GRÁFICO DE EVOLUCIÓN

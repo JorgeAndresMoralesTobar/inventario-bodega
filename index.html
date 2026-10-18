@@ -115,7 +115,7 @@
         </div>
       </header>
 
-      <!-- Tab 1: Dashboard con Tarjetas y Gráfico -->
+      <!-- Tab 1: Dashboard -->
       <div id="tab-dashboard" class="tab-content space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
@@ -130,19 +130,28 @@
           <!-- Tarjeta Valor Inventario con Filtro por Producto -->
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2">
             <div>
-              <div class="flex justify-between items-center mb-1">
-                <p class="text-slate-400 text-sm font-medium">Valor Inventario</p>
-              </div>
-              <select id="select-product-filter" onchange="updateProductValueFilter()" class="w-full bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg p-1.5 focus:outline-none focus:border-emerald-500 font-medium truncate">
+              <p class="text-slate-400 text-sm font-medium">Valor Inventario</p>
+              <select id="select-product-filter" onchange="updateProductValueFilter()" class="w-full bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg p-1.5 focus:outline-none focus:border-emerald-500 font-medium truncate mt-1">
                 <option value="all">📦 Todos los productos (Total)</option>
               </select>
             </div>
             <h3 id="stat-total-value" class="text-2xl md:text-3xl font-extrabold text-emerald-400 truncate">$0</h3>
           </div>
 
-          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-            <p class="text-slate-400 text-sm font-medium">Alertas Stock Bajo</p>
-            <h3 id="stat-low-stock" class="text-3xl font-extrabold text-rose-500 mt-1">0</h3>
+          <!-- Tarjeta Alertas Stock Bajo con Desplegable y Modal -->
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2">
+            <div>
+              <div class="flex justify-between items-center">
+                <p class="text-slate-400 text-sm font-medium">Alertas Stock Bajo</p>
+                <button onclick="openLowStockModal()" title="Ver lista completa" class="text-xs text-rose-400 hover:text-rose-300 font-semibold underline">
+                  Ver lista
+                </button>
+              </div>
+              <select id="select-low-stock-filter" onchange="previewLowStockItem()" class="w-full bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg p-1.5 focus:outline-none focus:border-rose-500 font-medium truncate mt-1">
+                <option value="all">⚠️ Mostrar todos los críticos</option>
+              </select>
+            </div>
+            <h3 id="stat-low-stock" class="text-2xl md:text-3xl font-extrabold text-rose-500 truncate">0</h3>
           </div>
         </div>
 
@@ -254,6 +263,39 @@
       </div>
 
     </main>
+  </div>
+
+  <!-- MODAL PRODUCTOS STOCK BAJO (NUEVO) -->
+  <div id="low-stock-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-2xl shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-xl font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Productos en Stock Bajo
+        </h3>
+        <button onclick="closeLowStockModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+
+      <div class="max-h-96 overflow-y-auto border border-slate-800 rounded-xl">
+        <table class="w-full text-left text-slate-300">
+          <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
+            <tr>
+              <th class="p-3">Código</th>
+              <th class="p-3">Producto</th>
+              <th class="p-3">Stock Actual</th>
+              <th class="p-3">Mínimo</th>
+              <th class="p-3">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="low-stock-modal-body" class="divide-y divide-slate-800 text-sm"></tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeLowStockModal()" class="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cerrar</button>
+      </div>
+    </div>
   </div>
 
   <!-- Modal Registrar Movimiento -->
