@@ -77,6 +77,11 @@
             <i class="fa-solid fa-arrow-right-arrow-left w-5"></i> Historial
           </button>
 
+          <!-- NUEVA PESTAÑA: DISTRIBUIDORES / PROVEEDORES -->
+          <button onclick="switchTab('distributors')" id="nav-distributors" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
+            <i class="fa-solid fa-truck-field w-5"></i> Distribuidores
+          </button>
+
           <button onclick="switchTab('requests')" id="nav-requests" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
             <i class="fa-solid fa-comment-dots w-5"></i> Peticiones
           </button>
@@ -127,7 +132,7 @@
             <h3 id="stat-total-products" class="text-3xl font-extrabold text-white mt-1">0</h3>
           </div>
 
-          <!-- Tarjeta Unidades en Stock con Buscador -->
+          <!-- Tarjeta Unidades en Stock -->
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
             <div>
               <p class="text-slate-400 text-sm font-medium mb-1">Unidades en Stock</p>
@@ -149,7 +154,7 @@
             <h3 id="stat-total-units" class="text-2xl md:text-3xl font-extrabold text-indigo-400 truncate">0</h3>
           </div>
           
-          <!-- Tarjeta Valor Inventario con Buscador -->
+          <!-- Tarjeta Valor Inventario -->
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
             <div>
               <p class="text-slate-400 text-sm font-medium mb-1">Valor Inventario</p>
@@ -171,7 +176,7 @@
             <h3 id="stat-total-value" class="text-2xl md:text-3xl font-extrabold text-emerald-400 truncate">$0</h3>
           </div>
 
-          <!-- Tarjeta Alertas Stock Bajo con Buscador -->
+          <!-- Tarjeta Alertas Stock Bajo -->
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
             <div>
               <div class="flex justify-between items-center mb-1">
@@ -243,7 +248,7 @@
         </div>
       </div>
 
-      <!-- TAB 3: HISTORIAL CON FILTROS -->
+      <!-- Tab 3: Historial -->
       <div id="tab-movements" class="tab-content hidden space-y-6">
         <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
           <div>
@@ -286,7 +291,52 @@
         </div>
       </div>
 
-      <!-- TAB 4: PETICIONES Y SUGERENCIAS -->
+      <!-- TAB NUEVO: DISTRIBUIDORES / PROVEEDORES -->
+      <div id="tab-distributors" class="tab-content hidden space-y-6">
+        <!-- BARRA DE BÚSQUEDA Y FILTROS POR CADA COLUMNA -->
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">BUSCAR POR NOMBRE O TELÉFONO</label>
+            <input type="text" id="dist-filter-search" oninput="applyDistributorFilters()" placeholder="🔍 Nombre, teléfono..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">FILTRAR POR ACCIÓN / TIPO</label>
+            <select id="dist-filter-category" onchange="applyDistributorFilters()" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
+              <option value="ALL">Todas las acciones</option>
+              <option value="PROVEEDORES">PROVEEDORES</option>
+              <option value="ENVÍOS">ENVÍOS</option>
+              <option value="CONTADURÍA">CONTADURÍA</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">FILTRAR POR MUNICIPIO</label>
+            <input type="text" id="dist-filter-municipality" oninput="applyDistributorFilters()" placeholder="🔍 Municipio..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
+          </div>
+          <div class="flex items-end">
+            <button onclick="openAddDistributorModal()" id="btn-add-distributor" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold p-3 rounded-xl transition shadow-lg shadow-amber-600/30 flex items-center justify-center gap-2">
+              <i class="fa-solid fa-user-plus"></i> Nuevo Distribuidor
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+          <table class="w-full text-left text-slate-300">
+            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
+              <tr>
+                <th class="p-4">Acción / Tipo</th>
+                <th class="p-4">Nombre Completo</th>
+                <th class="p-4">Contacto / Teléfono</th>
+                <th class="p-4">Municipio / Dirección</th>
+                <th class="p-4">Email / Notas</th>
+                <th class="p-4">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="distributors-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab 4: Peticiones -->
       <div id="tab-requests" class="tab-content hidden space-y-6">
         <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
           <h3 class="text-lg font-bold text-white">Enviar Petición o Sugerencia</h3>
@@ -368,6 +418,48 @@
       </div>
 
     </main>
+  </div>
+
+  <!-- MODAL DISTRIBUIDOR (CREAR/EDITAR) -->
+  <div id="distributor-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
+      <h3 class="text-xl font-bold text-white" id="dist-modal-title">Añadir Distribuidor</h3>
+      <input type="hidden" id="dist-id">
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">ACCIÓN / CATEGORÍA</label>
+        <select id="dist-category" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+          <option value="PROVEEDORES">PROVEEDORES</option>
+          <option value="ENVÍOS">ENVÍOS</option>
+          <option value="CONTADURÍA">CONTADURÍA</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE COMPLETO</label>
+        <input type="text" id="dist-name" required placeholder="Ej: Elkin Cardona Alvarez" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">CONTACTO / TELÉFONO</label>
+        <input type="text" id="dist-phone" placeholder="Ej: +57 3127060534" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">MUNICIPIO / DIRECCIÓN</label>
+        <input type="text" id="dist-municipality" placeholder="Ej: Pereira" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">EMAIL / OBSERVACIONES</label>
+        <input type="text" id="dist-notes" placeholder="Ej: contacto@ejemplo.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div class="flex gap-3 justify-end pt-2">
+        <button onclick="closeDistributorModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
+        <button onclick="saveDistributor()" class="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-500 shadow-lg shadow-amber-600/30">Guardar</button>
+      </div>
+    </div>
   </div>
 
   <!-- MODAL PRODUCTOS STOCK BAJO -->

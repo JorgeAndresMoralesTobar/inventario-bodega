@@ -8,6 +8,7 @@ let products = [];
 let movements = [];
 let systemUsers = [];
 let appRequests = [];
+let distributors = [];
 let currentUser = null;
 let trendChart = null;
 
@@ -79,6 +80,7 @@ async function showAppScreen() {
   applyRolePermissions();
   await fetchProducts();
   await fetchMovements();
+  await fetchDistributors();
   await fetchRequests();
 
   if (currentUser.role === 'admin') {
@@ -92,11 +94,14 @@ function applyRolePermissions() {
   const btnMovement = document.getElementById("btn-new-movement");
   const navUsers = document.getElementById("nav-users");
   const btnAddProduct = document.getElementById("btn-add-product");
+  const btnAddDist = document.getElementById("btn-add-distributor");
 
   if (currentUser.role === "viewer") {
     if (btnMovement) btnMovement.classList.add("hidden");
+    if (btnAddDist) btnAddDist.classList.add("hidden");
   } else {
     if (btnMovement) btnMovement.classList.remove("hidden");
+    if (btnAddDist) btnAddDist.classList.remove("hidden");
   }
 
   if (currentUser.role === "admin") {
@@ -167,6 +172,9 @@ function subscribeRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "movements" }, async () => {
       await fetchMovements();
     })
+    .on("postgres_changes", { event: "*", schema: "public", table: "distributors" }, async () => {
+      await fetchDistributors();
+    })
     .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, async () => {
       await fetchRequests();
     })
@@ -203,9 +211,178 @@ async function fetchUsers() {
   }
 }
 
-// DESPLEGABLES CON BUSCADOR DINÁMICO Y LISTA COMPLETA EN TARJETAS
+// MÓDULO NUEVO: DISTRIBUIDORES / PROVEEDORES
+async function fetchDistributors() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from("distributors").select("*").order("id", { ascending: true });
+  if (!error && data) {
+    distributors = data;
+    renderDistributors();
+  }
+}
 
-// 1. Buscador en Unidades en Stock (NUEVO)
+function applyDistributorFilters() {
+  const query = document.getElementById("dist-filter-search").value.toLowerCase().trim();
+  const categoryFilter = document.getElementById("dist-filter-category").value;
+  const municipalityFilter = document.getElementById("dist-filter-municipality").value.toLowerCase().trim();
+
+  const filtered = distributors.filter(d => {
+    const matchesQuery = !query || 
+      (d.name && d.name.toLowerCase().includes(query)) || 
+      (d.phone && d.phone.toLowerCase().includes(query)) ||
+      (d.email && d.email.toLowerCase().includes(query)) ||
+      (d.notes && d.notes.toLowerCase().includes(query));
+
+    const matchesCategory = (categoryFilter === 'ALL') || (d.category === categoryFilter);
+    const matchesMunicipality = !municipalityFilter || (d.municipality && d.municipality.toLowerCase().includes(municipalityFilter));
+
+    return matchesQuery && matchesCategory && matchesMunicipality;
+  });
+
+  renderDistributors(filtered);
+}
+
+function renderDistributors(customList = null) {
+  const list = customList || distributors;
+  const tbody = document.getElementById("distributors-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const canEdit = currentUser && currentUser.role !== 'viewer';
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No se encontraron distribuidores.</td></tr>`;
+    return;
+  }
+
+  list.forEach(d => {
+    let catClass = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    if (d.category === 'ENVÍOS') catClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    if (d.category === 'CONTADURÍA') catClass = 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
+
+    const cleanPhone = d.phone ? d.phone.replace(/[^0-9]/g, '') : '';
+
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition">
+        <td class="p-4">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold border ${catClass}">
+            ${d.category || 'PROVEEDORES'}
+          </span>
+        </td>
+        <td class="p-4 font-bold text-white">${d.name}</td>
+        <td class="p-4 font-mono text-xs">
+          ${d.phone ? `
+            <div class="flex items-center gap-2">
+              <span class="text-amber-400 font-semibold">${d.phone}</span>
+              <a href="https://wa.me/${cleanPhone}" target="_blank" title="Abrir WhatsApp" class="text-emerald-400 hover:text-emerald-300">
+                <i class="fa-brands fa-whatsapp text-sm"></i>
+              </a>
+            </div>
+          ` : '<span class="text-slate-600">-</span>'}
+        </td>
+        <td class="p-4 text-slate-300">${d.municipality || '-'}</td>
+        <td class="p-4 text-xs text-slate-400">${d.notes || d.email || '-'}</td>
+        <td class="p-4 flex gap-3">
+          ${canEdit ? `<button onclick="openEditDistributorModal(${d.id})" class="text-amber-400 hover:text-amber-300 text-xs font-semibold"><i class="fa-solid fa-pen"></i> Editar</button>` : ''}
+          ${isAdmin ? `<button onclick="deleteDistributor(${d.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash"></i> Eliminar</button>` : ''}
+          ${!canEdit && !isAdmin ? '<span class="text-xs text-slate-600">Solo lectura</span>' : ''}
+        </td>
+      </tr>
+    `;
+  });
+}
+
+function openAddDistributorModal() {
+  if (!currentUser || currentUser.role === 'viewer') return;
+  document.getElementById("dist-modal-title").innerText = "Añadir Distribuidor";
+  document.getElementById("dist-id").value = "";
+  document.getElementById("dist-category").value = "PROVEEDORES";
+  document.getElementById("dist-name").value = "";
+  document.getElementById("dist-phone").value = "";
+  document.getElementById("dist-municipality").value = "";
+  document.getElementById("dist-notes").value = "";
+
+  document.getElementById("distributor-modal").classList.remove("hidden");
+}
+
+function openEditDistributorModal(distId) {
+  if (!currentUser || currentUser.role === 'viewer') return;
+  const d = distributors.find(item => item.id === distId);
+  if (!d) return;
+
+  document.getElementById("dist-modal-title").innerText = "Editar Distribuidor";
+  document.getElementById("dist-id").value = d.id;
+  document.getElementById("dist-category").value = d.category || "PROVEEDORES";
+  document.getElementById("dist-name").value = d.name;
+  document.getElementById("dist-phone").value = d.phone || "";
+  document.getElementById("dist-municipality").value = d.municipality || "";
+  document.getElementById("dist-notes").value = d.notes || d.email || "";
+
+  document.getElementById("distributor-modal").classList.remove("hidden");
+}
+
+function closeDistributorModal() {
+  document.getElementById("distributor-modal").classList.add("hidden");
+}
+
+async function saveDistributor() {
+  if (!supabaseClient || currentUser.role === 'viewer') return;
+
+  const id = document.getElementById("dist-id").value;
+  const category = document.getElementById("dist-category").value;
+  const name = document.getElementById("dist-name").value.trim();
+  const phone = document.getElementById("dist-phone").value.trim();
+  const municipality = document.getElementById("dist-municipality").value.trim();
+  const notes = document.getElementById("dist-notes").value.trim();
+
+  if (!name) {
+    alert("⚠️ El nombre del distribuidor es obligatorio.");
+    return;
+  }
+
+  if (id) {
+    // Editar existente
+    const { error } = await supabaseClient
+      .from("distributors")
+      .update({ category, name, phone, municipality, notes })
+      .eq("id", parseInt(id));
+
+    if (error) {
+      alert("Error al actualizar distribuidor: " + error.message);
+      return;
+    }
+  } else {
+    // Crear nuevo
+    const { error } = await supabaseClient
+      .from("distributors")
+      .insert([{ category, name, phone, municipality, notes }]);
+
+    if (error) {
+      alert("Error al guardar distribuidor: " + error.message);
+      return;
+    }
+  }
+
+  closeDistributorModal();
+  await fetchDistributors();
+}
+
+async function deleteDistributor(distId) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  if (!confirm("¿Seguro que deseas eliminar este distribuidor?")) return;
+
+  const { error } = await supabaseClient.from("distributors").delete().eq("id", distId);
+  if (error) {
+    alert("Error al eliminar distribuidor: " + error.message);
+    return;
+  }
+
+  await fetchDistributors();
+}
+
+// DESPLEGABLES CON BUSCADOR EN TARJETAS
 function filterUnitsProducts(showAll = false) {
   const input = document.getElementById("select-units-filter-search");
   const resultsDiv = document.getElementById("select-units-filter-results");
@@ -256,7 +433,6 @@ function updateProductUnitsFilter() {
   }
 }
 
-// 2. Buscador en Valor del Inventario
 function filterValuationProducts(showAll = false) {
   const input = document.getElementById("select-product-filter-search");
   const resultsDiv = document.getElementById("select-product-filter-results");
@@ -292,7 +468,6 @@ function selectValuationProduct(id, label) {
   updateProductValueFilter();
 }
 
-// 3. Buscador en Alertas Stock Bajo
 function filterLowStockProducts(showAll = false) {
   const input = document.getElementById("select-low-stock-filter-search");
   const resultsDiv = document.getElementById("select-low-stock-filter-results");
@@ -344,7 +519,6 @@ function previewLowStockItem() {
   }
 }
 
-// ACTUALIZAR VALOR DE INVENTARIO Y GRÁFICO
 function updateProductValueFilter() {
   const selectedId = document.getElementById('select-product-filter-id').value;
   const chartTitle = document.getElementById('chart-title');
@@ -366,7 +540,7 @@ function updateProductValueFilter() {
   renderChart();
 }
 
-// HISTORIAL Y FILTROS AVANZADOS
+// HISTORIAL Y FILTROS
 function applyMovementFilters() {
   const query = document.getElementById("mov-filter-search").value.toLowerCase().trim();
   const typeFilter = document.getElementById("mov-filter-type").value;
