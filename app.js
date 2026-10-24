@@ -82,7 +82,6 @@ async function showAppScreen() {
   await fetchMovements();
   await fetchRequests();
 
-  // Cargar distribuidores solo si es Admin u Operador
   if (currentUser.role === 'admin' || currentUser.role === 'operator') {
     await fetchDistributors();
   }
@@ -101,7 +100,6 @@ function applyRolePermissions() {
   const btnAddProduct = document.getElementById("btn-add-product");
   const btnAddDist = document.getElementById("btn-add-distributor");
 
-  // VISIBILIDAD DE PESTAÑA DISTRIBUIDORES (Solo Admin y Operador)
   if (currentUser.role === "admin" || currentUser.role === "operator") {
     if (navDistributors) navDistributors.classList.remove("hidden");
   } else {
@@ -192,6 +190,11 @@ function subscribeRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, async () => {
       await fetchRequests();
     })
+    .on("postgres_changes", { event: "*", schema: "public", table: "app_users" }, async () => {
+      if (currentUser.role === 'admin') {
+        await fetchUsers();
+      }
+    })
     .subscribe();
 }
 
@@ -222,6 +225,97 @@ async function fetchUsers() {
   if (!error && data) {
     systemUsers = data;
     renderUsers();
+  }
+}
+
+// CAMBIAR ROL DE USUARIO DINÁMICAMENTE DESDE LA TABLA
+async function changeUserRole(userId, newRole) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  const targetUser = systemUsers.find(u => u.id === userId);
+  if (!targetUser) return;
+
+  if (targetUser.role === 'admin') {
+    alert("⚠️ No se puede modificar el rol del administrador principal.");
+    await fetchUsers();
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from("app_users")
+    .update({ role: newRole })
+    .eq("id", userId);
+
+  if (error) {
+    alert("Error al cambiar el rol: " + error.message);
+    await fetchUsers();
+    return;
+  }
+
+  alert(`✅ Rol de @${targetUser.username} cambiado a ${newRole.toUpperCase()}.`);
+  await fetchUsers();
+}
+
+function renderUsers() {
+  const tbody = document.getElementById("users-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  systemUsers.forEach(u => {
+    const isAdmin = u.role === 'admin';
+
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition">
+        <td class="p-4 font-bold text-white">@${u.username}</td>
+        <td class="p-4">
+          ${isAdmin ? `
+            <span class="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+              ADMIN
+            </span>
+          ` : `
+            <select onchange="changeUserRole(${u.id}, this.value)" class="bg-slate-900 border border-slate-700 text-xs text-amber-400 font-bold rounded-lg px-2.5 py-1 focus:outline-none focus:border-amber-500 cursor-pointer">
+              <option value="operator" ${u.role === 'operator' ? 'selected' : ''}>👷 OPERATOR</option>
+              <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>👁️ VIEWER</option>
+            </select>
+          `}
+        </td>
+        <td class="p-4 text-xs text-slate-400">${new Date(u.created_at).toLocaleDateString()}</td>
+        <td class="p-4">
+          ${!isAdmin ? `<button onclick="deleteUser(${u.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash mr-1"></i> Eliminar</button>` : '<span class="text-xs text-slate-600">Principal</span>'}
+        </td>
+      </tr>
+    `;
+  });
+}
+
+async function handleCreateUser(e) {
+  e.preventDefault();
+  if (currentUser.role !== 'admin') return;
+
+  const username = document.getElementById("new-username").value.trim();
+  const password = document.getElementById("new-password").value.trim();
+  const role = document.getElementById("new-role").value;
+
+  const { error } = await supabaseClient.from("app_users").insert([{ username, password, role }]);
+
+  if (error) {
+    alert("Error al crear usuario: " + error.message);
+    return;
+  }
+
+  alert(`✅ Usuario @${username} creado con éxito.`);
+  document.getElementById("new-username").value = "";
+  document.getElementById("new-password").value = "";
+  await fetchUsers();
+}
+
+async function deleteUser(userId) {
+  if (currentUser.role !== 'admin') return;
+  if (!confirm("¿Seguro que deseas eliminar este usuario?")) return;
+
+  const { error } = await supabaseClient.from("app_users").delete().eq("id", userId);
+  if (!error) {
+    await fetchUsers();
   }
 }
 
@@ -803,61 +897,6 @@ async function deleteMovement(movementId) {
   }
 
   await fetchMovements();
-}
-
-// GESTIÓN DE USUARIOS
-async function handleCreateUser(e) {
-  e.preventDefault();
-  if (currentUser.role !== 'admin') return;
-
-  const username = document.getElementById("new-username").value.trim();
-  const password = document.getElementById("new-password").value.trim();
-  const role = document.getElementById("new-role").value;
-
-  const { error } = await supabaseClient.from("app_users").insert([{ username, password, role }]);
-
-  if (error) {
-    alert("Error al crear usuario: " + error.message);
-    return;
-  }
-
-  alert(`✅ Usuario @${username} creado con éxito.`);
-  document.getElementById("new-username").value = "";
-  document.getElementById("new-password").value = "";
-  await fetchUsers();
-}
-
-async function deleteUser(userId) {
-  if (currentUser.role !== 'admin') return;
-  if (!confirm("¿Seguro que deseas eliminar este usuario?")) return;
-
-  const { error } = await supabaseClient.from("app_users").delete().eq("id", userId);
-  if (!error) {
-    await fetchUsers();
-  }
-}
-
-function renderUsers() {
-  const tbody = document.getElementById("users-table-body");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  systemUsers.forEach(u => {
-    tbody.innerHTML += `
-      <tr class="hover:bg-slate-900 transition">
-        <td class="p-4 font-bold text-white">@${u.username}</td>
-        <td class="p-4">
-          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${u.role === 'admin' ? 'bg-indigo-500/20 text-indigo-400' : u.role === 'operator' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-500/20 text-slate-400'}">
-            ${u.role.toUpperCase()}
-          </span>
-        </td>
-        <td class="p-4 text-xs text-slate-400">${new Date(u.created_at).toLocaleDateString()}</td>
-        <td class="p-4">
-          ${u.role !== 'admin' ? `<button onclick="deleteUser(${u.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold">Eliminar</button>` : '<span class="text-xs text-slate-600">Principal</span>'}
-        </td>
-      </tr>
-    `;
-  });
 }
 
 // NAVEGACIÓN TAB
