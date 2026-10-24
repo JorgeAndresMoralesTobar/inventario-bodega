@@ -80,8 +80,12 @@ async function showAppScreen() {
   applyRolePermissions();
   await fetchProducts();
   await fetchMovements();
-  await fetchDistributors();
   await fetchRequests();
+
+  // Cargar distribuidores solo si es Admin u Operador
+  if (currentUser.role === 'admin' || currentUser.role === 'operator') {
+    await fetchDistributors();
+  }
 
   if (currentUser.role === 'admin') {
     await fetchUsers();
@@ -93,8 +97,16 @@ async function showAppScreen() {
 function applyRolePermissions() {
   const btnMovement = document.getElementById("btn-new-movement");
   const navUsers = document.getElementById("nav-users");
+  const navDistributors = document.getElementById("nav-distributors");
   const btnAddProduct = document.getElementById("btn-add-product");
   const btnAddDist = document.getElementById("btn-add-distributor");
+
+  // VISIBILIDAD DE PESTAÑA DISTRIBUIDORES (Solo Admin y Operador)
+  if (currentUser.role === "admin" || currentUser.role === "operator") {
+    if (navDistributors) navDistributors.classList.remove("hidden");
+  } else {
+    if (navDistributors) navDistributors.classList.add("hidden");
+  }
 
   if (currentUser.role === "viewer") {
     if (btnMovement) btnMovement.classList.add("hidden");
@@ -173,7 +185,9 @@ function subscribeRealtime() {
       await fetchMovements();
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "distributors" }, async () => {
-      await fetchDistributors();
+      if (currentUser.role === 'admin' || currentUser.role === 'operator') {
+        await fetchDistributors();
+      }
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, async () => {
       await fetchRequests();
@@ -211,7 +225,7 @@ async function fetchUsers() {
   }
 }
 
-// MÓDULO NUEVO: DISTRIBUIDORES / PROVEEDORES
+// DISTRIBUIDORES / PROVEEDORES
 async function fetchDistributors() {
   if (!supabaseClient) return;
   const { data, error } = await supabaseClient.from("distributors").select("*").order("id", { ascending: true });
@@ -342,7 +356,6 @@ async function saveDistributor() {
   }
 
   if (id) {
-    // Editar existente
     const { error } = await supabaseClient
       .from("distributors")
       .update({ category, name, phone, municipality, notes })
@@ -353,7 +366,6 @@ async function saveDistributor() {
       return;
     }
   } else {
-    // Crear nuevo
     const { error } = await supabaseClient
       .from("distributors")
       .insert([{ category, name, phone, municipality, notes }]);

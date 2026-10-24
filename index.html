@@ -77,8 +77,8 @@
             <i class="fa-solid fa-arrow-right-arrow-left w-5"></i> Historial
           </button>
 
-          <!-- NUEVA PESTAÑA: DISTRIBUIDORES / PROVEEDORES -->
-          <button onclick="switchTab('distributors')" id="nav-distributors" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
+          <!-- PESTAÑA DISTRIBUIDORES (Controlada por permisos: Admin y Operador) -->
+          <button onclick="switchTab('distributors')" id="nav-distributors" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium hidden">
             <i class="fa-solid fa-truck-field w-5"></i> Distribuidores
           </button>
 
@@ -291,9 +291,8 @@
         </div>
       </div>
 
-      <!-- TAB NUEVO: DISTRIBUIDORES / PROVEEDORES -->
+      <!-- TAB DISTRIBUIDORES / PROVEEDORES -->
       <div id="tab-distributors" class="tab-content hidden space-y-6">
-        <!-- BARRA DE BÚSQUEDA Y FILTROS POR CADA COLUMNA -->
         <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
           <div>
             <label class="block text-xs font-semibold text-slate-400 mb-1">BUSCAR POR NOMBRE O TELÉFONO</label>
