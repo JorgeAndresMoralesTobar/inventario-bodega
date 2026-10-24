@@ -17,6 +17,18 @@ document.addEventListener("DOMContentLoaded", () => {
     currentUser = JSON.parse(savedUser);
     showAppScreen();
   }
+
+  // Cerrar desplegables de búsqueda al hacer clic fuera
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#select-product-filter-search") && !e.target.closest("#select-product-filter-results")) {
+      const res = document.getElementById("select-product-filter-results");
+      if (res) res.classList.add("hidden");
+    }
+    if (!e.target.closest("#select-low-stock-filter-search") && !e.target.closest("#select-low-stock-filter-results")) {
+      const res = document.getElementById("select-low-stock-filter-results");
+      if (res) res.classList.add("hidden");
+    }
+  });
 });
 
 // LOGIN Y SESIÓN
@@ -163,8 +175,6 @@ async function fetchProducts() {
   const { data, error } = await supabaseClient.from("products").select("*").order("id", { ascending: true });
   if (!error && data) {
     products = data;
-    populateProductSelectOptions();
-    populateLowStockSelectOptions();
     renderDashboard();
     renderProducts();
   }
@@ -189,12 +199,133 @@ async function fetchUsers() {
   }
 }
 
+// DESPLEGABLES CON BUSCADOR DINÁMICO EN EL DASHBOARD
+
+// 1. Buscador en Valor del Inventario
+function filterValuationProducts() {
+  const input = document.getElementById("select-product-filter-search");
+  const resultsDiv = document.getElementById("select-product-filter-results");
+  const query = input.value.toLowerCase().trim();
+
+  if (!query) {
+    resultsDiv.classList.add("hidden");
+    return;
+  }
+
+  let html = `
+    <div onclick="selectValuationProduct('all', '📦 Todos los productos (Total)')" class="p-2.5 text-xs text-slate-200 hover:bg-emerald-600 hover:text-white cursor-pointer transition">
+      📦 Todos los productos (Total)
+    </div>
+  `;
+
+  const filtered = products.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  );
+
+  filtered.forEach(p => {
+    html += `
+      <div onclick="selectValuationProduct(${p.id}, '${p.code ? p.code + ' - ' : ''}${p.name.replace(/'/g, "\\'")}')" class="p-2.5 text-xs text-slate-200 hover:bg-emerald-600 hover:text-white cursor-pointer transition truncate">
+        ${p.code ? '<strong>' + p.code + '</strong> - ' : ''}${p.name}
+      </div>
+    `;
+  });
+
+  resultsDiv.innerHTML = html;
+  resultsDiv.classList.remove("hidden");
+}
+
+function selectValuationProduct(id, label) {
+  document.getElementById("select-product-filter-search").value = label;
+  document.getElementById("select-product-filter-id").value = id;
+  document.getElementById("select-product-filter-results").classList.add("hidden");
+  updateProductValueFilter();
+}
+
+// 2. Buscador en Alertas Stock Bajo
+function filterLowStockProducts() {
+  const input = document.getElementById("select-low-stock-filter-search");
+  const resultsDiv = document.getElementById("select-low-stock-filter-results");
+  const query = input.value.toLowerCase().trim();
+  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0));
+
+  if (!query) {
+    resultsDiv.classList.add("hidden");
+    return;
+  }
+
+  let html = `
+    <div onclick="selectLowStockProduct('all', '⚠️ Mostrar todos los críticos (${lowStockItems.length})')" class="p-2.5 text-xs text-slate-200 hover:bg-rose-600 hover:text-white cursor-pointer transition">
+      ⚠️ Mostrar todos los críticos (${lowStockItems.length})
+    </div>
+  `;
+
+  const filtered = lowStockItems.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  );
+
+  filtered.forEach(p => {
+    html += `
+      <div onclick="selectLowStockProduct(${p.id}, '${p.name.replace(/'/g, "\\'")} (Stock: ${p.stock})')" class="p-2.5 text-xs text-slate-200 hover:bg-rose-600 hover:text-white cursor-pointer transition truncate">
+        ${p.name} <span class="font-bold text-rose-400">(${p.stock} un.)</span>
+      </div>
+    `;
+  });
+
+  resultsDiv.innerHTML = html;
+  resultsDiv.classList.remove("hidden");
+}
+
+function selectLowStockProduct(id, label) {
+  document.getElementById("select-low-stock-filter-search").value = label;
+  document.getElementById("select-low-stock-filter-id").value = id;
+  document.getElementById("select-low-stock-filter-results").classList.add("hidden");
+  previewLowStockItem();
+}
+
+function previewLowStockItem() {
+  const selectedId = document.getElementById('select-low-stock-filter-id').value;
+  const statLowStock = document.getElementById('stat-low-stock');
+
+  if (selectedId === 'all') {
+    const totalLow = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0)).length;
+    statLowStock.innerText = totalLow;
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) {
+      statLowStock.innerText = `${p.stock} un.`;
+    }
+  }
+}
+
+// ACTUALIZAR VALOR DE INVENTARIO Y GRÁFICO
+function updateProductValueFilter() {
+  const selectedId = document.getElementById('select-product-filter-id').value;
+  const chartTitle = document.getElementById('chart-title');
+
+  let displayValue = 0;
+
+  if (selectedId === 'all') {
+    displayValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
+    if (chartTitle) chartTitle.innerText = "Evolución del Valor del Inventario (Total)";
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) {
+      displayValue = (Number(p.stock) || 0) * (Number(p.purchase_price) || 0);
+      if (chartTitle) chartTitle.innerText = `Evolución del Valor: ${p.name}`;
+    }
+  }
+
+  document.getElementById('stat-total-value').innerText = "$" + displayValue.toLocaleString();
+  renderChart();
+}
+
 // MÓDULO DE PETICIONES Y SUGERENCIAS
 async function fetchRequests() {
   if (!supabaseClient) return;
   let query = supabaseClient.from("requests").select("*").order("created_at", { ascending: false });
 
-  // Si no es administrador, solo trae sus propias peticiones
   if (currentUser && currentUser.role !== 'admin') {
     query = query.eq("username", currentUser.username);
   }
@@ -314,58 +445,6 @@ function renderRequests() {
   });
 }
 
-// POBLAR SELECTOR DE VALOR INVENTARIO
-function populateProductSelectOptions() {
-  const select = document.getElementById('select-product-filter');
-  if (!select) return;
-
-  const currentSelection = select.value;
-  select.innerHTML = '<option value="all">📦 Todos los productos (Total)</option>';
-
-  products.forEach(p => {
-    select.innerHTML += `<option value="${p.id}">${p.code ? p.code + ' - ' : ''}${p.name}</option>`;
-  });
-
-  if (currentSelection) {
-    select.value = currentSelection;
-  }
-}
-
-// POBLAR SELECTOR DE STOCK BAJO
-function populateLowStockSelectOptions() {
-  const select = document.getElementById('select-low-stock-filter');
-  if (!select) return;
-
-  const currentSelection = select.value;
-  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0));
-
-  select.innerHTML = `<option value="all">⚠️ Mostrar todos los críticos (${lowStockItems.length})</option>`;
-
-  lowStockItems.forEach(p => {
-    select.innerHTML += `<option value="${p.id}">${p.name} (Stock: ${p.stock})</option>`;
-  });
-
-  if (currentSelection) {
-    select.value = currentSelection;
-  }
-}
-
-function previewLowStockItem() {
-  const select = document.getElementById('select-low-stock-filter');
-  const statLowStock = document.getElementById('stat-low-stock');
-  const selectedId = select.value;
-
-  if (selectedId === 'all') {
-    const totalLow = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0)).length;
-    statLowStock.innerText = totalLow;
-  } else {
-    const p = products.find(prod => prod.id === parseInt(selectedId));
-    if (p) {
-      statLowStock.innerText = `${p.stock} un.`;
-    }
-  }
-}
-
 // MODAL STOCK BAJO
 function openLowStockModal() {
   const modal = document.getElementById('low-stock-modal');
@@ -401,29 +480,6 @@ function openLowStockModal() {
 
 function closeLowStockModal() {
   document.getElementById('low-stock-modal').classList.add('hidden');
-}
-
-// ACTUALIZAR FILTRO POR PRODUCTO SELECCIONADO
-function updateProductValueFilter() {
-  const select = document.getElementById('select-product-filter');
-  const selectedId = select.value;
-  const chartTitle = document.getElementById('chart-title');
-
-  let displayValue = 0;
-
-  if (selectedId === 'all') {
-    displayValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
-    if (chartTitle) chartTitle.innerText = "Evolución del Valor del Inventario (Total)";
-  } else {
-    const p = products.find(prod => prod.id === parseInt(selectedId));
-    if (p) {
-      displayValue = (Number(p.stock) || 0) * (Number(p.purchase_price) || 0);
-      if (chartTitle) chartTitle.innerText = `Evolución del Valor: ${p.name}`;
-    }
-  }
-
-  document.getElementById('stat-total-value').innerText = "$" + displayValue.toLocaleString();
-  renderChart();
 }
 
 // ELIMINAR REGISTRO DE HISTORIAL
@@ -532,8 +588,7 @@ function renderChart() {
   const canvas = document.getElementById('valueTrendChart');
   if (!canvas) return;
 
-  const select = document.getElementById('select-product-filter');
-  const selectedId = select ? select.value : 'all';
+  const selectedId = document.getElementById('select-product-filter-id') ? document.getElementById('select-product-filter-id').value : 'all';
 
   let currentValue = 0;
   if (selectedId === 'all') {

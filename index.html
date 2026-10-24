@@ -131,29 +131,49 @@
             <h3 id="stat-total-units" class="text-3xl font-extrabold text-indigo-400 mt-1">0</h3>
           </div>
           
-          <!-- Tarjeta Valor Inventario con Filtro por Producto -->
-          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2">
+          <!-- Tarjeta Valor Inventario con Buscador -->
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
             <div>
-              <p class="text-slate-400 text-sm font-medium">Valor Inventario</p>
-              <select id="select-product-filter" onchange="updateProductValueFilter()" class="w-full bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg p-1.5 focus:outline-none focus:border-emerald-500 font-medium truncate mt-1">
-                <option value="all">📦 Todos los productos (Total)</option>
-              </select>
+              <p class="text-slate-400 text-sm font-medium mb-1">Valor Inventario</p>
+              <div class="relative">
+                <input 
+                  type="text" 
+                  id="select-product-filter-search" 
+                  oninput="filterValuationProducts()" 
+                  placeholder="🔍 Buscar producto..." 
+                  value="📦 Todos los productos (Total)"
+                  autocomplete="off"
+                  class="w-full bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:border-emerald-500 truncate"
+                >
+                <input type="hidden" id="select-product-filter-id" value="all">
+                <div id="select-product-filter-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
+              </div>
             </div>
             <h3 id="stat-total-value" class="text-2xl md:text-3xl font-extrabold text-emerald-400 truncate">$0</h3>
           </div>
 
-          <!-- Tarjeta Alertas Stock Bajo -->
-          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2">
+          <!-- Tarjeta Alertas Stock Bajo con Buscador -->
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
             <div>
-              <div class="flex justify-between items-center">
+              <div class="flex justify-between items-center mb-1">
                 <p class="text-slate-400 text-sm font-medium">Alertas Stock Bajo</p>
                 <button onclick="openLowStockModal()" title="Ver lista completa" class="text-xs text-rose-400 hover:text-rose-300 font-semibold underline">
                   Ver lista
                 </button>
               </div>
-              <select id="select-low-stock-filter" onchange="previewLowStockItem()" class="w-full bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg p-1.5 focus:outline-none focus:border-rose-500 font-medium truncate mt-1">
-                <option value="all">⚠️ Mostrar todos los críticos</option>
-              </select>
+              <div class="relative">
+                <input 
+                  type="text" 
+                  id="select-low-stock-filter-search" 
+                  oninput="filterLowStockProducts()" 
+                  placeholder="🔍 Buscar crítico..." 
+                  value="⚠️ Mostrar todos los críticos"
+                  autocomplete="off"
+                  class="w-full bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:border-rose-500 truncate"
+                >
+                <input type="hidden" id="select-low-stock-filter-id" value="all">
+                <div id="select-low-stock-filter-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
+              </div>
             </div>
             <h3 id="stat-low-stock" class="text-2xl md:text-3xl font-extrabold text-rose-500 truncate">0</h3>
           </div>
@@ -223,7 +243,7 @@
         </div>
       </div>
 
-      <!-- TAB 4: PETICIONES Y SUGERENCIAS (NUEVO) -->
+      <!-- TAB 4: PETICIONES Y SUGERENCIAS -->
       <div id="tab-requests" class="tab-content hidden space-y-6">
         <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
           <h3 class="text-lg font-bold text-white">Enviar Petición o Sugerencia</h3>
