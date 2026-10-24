@@ -20,6 +20,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Cerrar desplegables de búsqueda al hacer clic fuera
   document.addEventListener("click", (e) => {
+    if (!e.target.closest("#select-units-filter-search") && !e.target.closest("#select-units-filter-results")) {
+      const res = document.getElementById("select-units-filter-results");
+      if (res) res.classList.add("hidden");
+    }
     if (!e.target.closest("#select-product-filter-search") && !e.target.closest("#select-product-filter-results")) {
       const res = document.getElementById("select-product-filter-results");
       if (res) res.classList.add("hidden");
@@ -199,9 +203,60 @@ async function fetchUsers() {
   }
 }
 
-// DESPLEGABLES CON BUSCADOR DINÁMICO Y LISTA COMPLETA
+// DESPLEGABLES CON BUSCADOR DINÁMICO Y LISTA COMPLETA EN TARJETAS
 
-// 1. Desplegable / Buscador en Valor del Inventario
+// 1. Buscador en Unidades en Stock (NUEVO)
+function filterUnitsProducts(showAll = false) {
+  const input = document.getElementById("select-units-filter-search");
+  const resultsDiv = document.getElementById("select-units-filter-results");
+  const query = showAll ? "" : input.value.toLowerCase().trim();
+
+  let html = `
+    <div onclick="selectUnitsProduct('all', '📦 Todas las unidades (Total)')" class="p-2.5 text-xs text-slate-200 hover:bg-indigo-600 hover:text-white cursor-pointer transition">
+      📦 Todas las unidades (Total)
+    </div>
+  `;
+
+  const filtered = query ? products.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  ) : products;
+
+  filtered.forEach(p => {
+    html += `
+      <div onclick="selectUnitsProduct(${p.id}, '${p.code ? p.code + ' - ' : ''}${p.name.replace(/'/g, "\\'")}')" class="p-2.5 text-xs text-slate-200 hover:bg-indigo-600 hover:text-white cursor-pointer transition truncate">
+        ${p.code ? '<strong>' + p.code + '</strong> - ' : ''}${p.name}
+      </div>
+    `;
+  });
+
+  resultsDiv.innerHTML = html;
+  resultsDiv.classList.remove("hidden");
+}
+
+function selectUnitsProduct(id, label) {
+  document.getElementById("select-units-filter-search").value = label;
+  document.getElementById("select-units-filter-id").value = id;
+  document.getElementById("select-units-filter-results").classList.add("hidden");
+  updateProductUnitsFilter();
+}
+
+function updateProductUnitsFilter() {
+  const selectedId = document.getElementById('select-units-filter-id').value;
+  const statUnits = document.getElementById('stat-total-units');
+
+  if (selectedId === 'all') {
+    const totalUnits = products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
+    statUnits.innerText = totalUnits.toLocaleString();
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) {
+      statUnits.innerText = (Number(p.stock) || 0).toLocaleString();
+    }
+  }
+}
+
+// 2. Buscador en Valor del Inventario
 function filterValuationProducts(showAll = false) {
   const input = document.getElementById("select-product-filter-search");
   const resultsDiv = document.getElementById("select-product-filter-results");
@@ -237,7 +292,7 @@ function selectValuationProduct(id, label) {
   updateProductValueFilter();
 }
 
-// 2. Desplegable / Buscador en Alertas Stock Bajo
+// 3. Buscador en Alertas Stock Bajo
 function filterLowStockProducts(showAll = false) {
   const input = document.getElementById("select-low-stock-filter-search");
   const resultsDiv = document.getElementById("select-low-stock-filter-results");
@@ -311,7 +366,7 @@ function updateProductValueFilter() {
   renderChart();
 }
 
-// HISTORIAL Y SUS FILTROS AVANZADOS (FECHA, TIPO Y BÚSQUEDA)
+// HISTORIAL Y FILTROS AVANZADOS
 function applyMovementFilters() {
   const query = document.getElementById("mov-filter-search").value.toLowerCase().trim();
   const typeFilter = document.getElementById("mov-filter-type").value;
@@ -371,7 +426,7 @@ function renderMovements(customList = null) {
   });
 }
 
-// MÓDULO DE PETICIONES Y SUGERENCIAS CON FILTRADO
+// PETICIONES Y SUGERENCIAS
 async function fetchRequests() {
   if (!supabaseClient) return;
   let query = supabaseClient.from("requests").select("*").order("created_at", { ascending: false });
@@ -632,14 +687,13 @@ function switchTab(tabName) {
 
 function renderDashboard() {
   const totalProducts = products.length;
-  const totalUnits = products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
   const lowStock = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0)).length;
 
   document.getElementById('stat-total-products').innerText = totalProducts;
-  document.getElementById('stat-total-units').innerText = totalUnits.toLocaleString();
   document.getElementById('stat-low-stock').innerText = lowStock;
   document.getElementById('total-count-badge').innerText = totalProducts;
 
+  updateProductUnitsFilter();
   updateProductValueFilter();
   previewLowStockItem();
 }

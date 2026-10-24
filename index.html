@@ -126,12 +126,30 @@
             <p class="text-slate-400 text-sm font-medium">Total Productos</p>
             <h3 id="stat-total-products" class="text-3xl font-extrabold text-white mt-1">0</h3>
           </div>
-          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-            <p class="text-slate-400 text-sm font-medium">Unidades en Stock</p>
-            <h3 id="stat-total-units" class="text-3xl font-extrabold text-indigo-400 mt-1">0</h3>
+
+          <!-- Tarjeta Unidades en Stock con Buscador -->
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
+            <div>
+              <p class="text-slate-400 text-sm font-medium mb-1">Unidades en Stock</p>
+              <div class="relative">
+                <input 
+                  type="text" 
+                  id="select-units-filter-search" 
+                  onfocus="filterUnitsProducts(true)"
+                  oninput="filterUnitsProducts(false)" 
+                  placeholder="📦 Todas las unidades (Total)" 
+                  value="📦 Todas las unidades (Total)"
+                  autocomplete="off"
+                  class="w-full bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:border-indigo-500 truncate cursor-pointer"
+                >
+                <input type="hidden" id="select-units-filter-id" value="all">
+                <div id="select-units-filter-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
+              </div>
+            </div>
+            <h3 id="stat-total-units" class="text-2xl md:text-3xl font-extrabold text-indigo-400 truncate">0</h3>
           </div>
           
-          <!-- Tarjeta Valor Inventario -->
+          <!-- Tarjeta Valor Inventario con Buscador -->
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
             <div>
               <p class="text-slate-400 text-sm font-medium mb-1">Valor Inventario</p>
@@ -153,7 +171,7 @@
             <h3 id="stat-total-value" class="text-2xl md:text-3xl font-extrabold text-emerald-400 truncate">$0</h3>
           </div>
 
-          <!-- Tarjeta Alertas Stock Bajo -->
+          <!-- Tarjeta Alertas Stock Bajo con Buscador -->
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
             <div>
               <div class="flex justify-between items-center mb-1">
@@ -225,7 +243,7 @@
         </div>
       </div>
 
-      <!-- TAB 3: HISTORIAL CON FILTROS DE FECHA Y TIPO (MEJORADO) -->
+      <!-- TAB 3: HISTORIAL CON FILTROS -->
       <div id="tab-movements" class="tab-content hidden space-y-6">
         <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
           <div>
@@ -268,7 +286,7 @@
         </div>
       </div>
 
-      <!-- TAB 4: PETICIONES Y SUGERENCIAS CON BUSCADOR (MEJORADO) -->
+      <!-- TAB 4: PETICIONES Y SUGERENCIAS -->
       <div id="tab-requests" class="tab-content hidden space-y-6">
         <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
           <h3 class="text-lg font-bold text-white">Enviar Petición o Sugerencia</h3>
