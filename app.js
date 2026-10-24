@@ -199,18 +199,13 @@ async function fetchUsers() {
   }
 }
 
-// DESPLEGABLES CON BUSCADOR DINÁMICO EN EL DASHBOARD
+// DESPLEGABLES CON BUSCADOR DINÁMICO Y LISTA COMPLETA
 
-// 1. Buscador en Valor del Inventario
-function filterValuationProducts() {
+// 1. Desplegable / Buscador en Valor del Inventario
+function filterValuationProducts(showAll = false) {
   const input = document.getElementById("select-product-filter-search");
   const resultsDiv = document.getElementById("select-product-filter-results");
-  const query = input.value.toLowerCase().trim();
-
-  if (!query) {
-    resultsDiv.classList.add("hidden");
-    return;
-  }
+  const query = showAll ? "" : input.value.toLowerCase().trim();
 
   let html = `
     <div onclick="selectValuationProduct('all', '📦 Todos los productos (Total)')" class="p-2.5 text-xs text-slate-200 hover:bg-emerald-600 hover:text-white cursor-pointer transition">
@@ -218,10 +213,10 @@ function filterValuationProducts() {
     </div>
   `;
 
-  const filtered = products.filter(p => 
+  const filtered = query ? products.filter(p => 
     (p.name && p.name.toLowerCase().includes(query)) || 
     (p.code && p.code.toLowerCase().includes(query))
-  );
+  ) : products;
 
   filtered.forEach(p => {
     html += `
@@ -242,17 +237,12 @@ function selectValuationProduct(id, label) {
   updateProductValueFilter();
 }
 
-// 2. Buscador en Alertas Stock Bajo
-function filterLowStockProducts() {
+// 2. Desplegable / Buscador en Alertas Stock Bajo
+function filterLowStockProducts(showAll = false) {
   const input = document.getElementById("select-low-stock-filter-search");
   const resultsDiv = document.getElementById("select-low-stock-filter-results");
-  const query = input.value.toLowerCase().trim();
+  const query = showAll ? "" : input.value.toLowerCase().trim();
   const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0));
-
-  if (!query) {
-    resultsDiv.classList.add("hidden");
-    return;
-  }
 
   let html = `
     <div onclick="selectLowStockProduct('all', '⚠️ Mostrar todos los críticos (${lowStockItems.length})')" class="p-2.5 text-xs text-slate-200 hover:bg-rose-600 hover:text-white cursor-pointer transition">
@@ -260,14 +250,14 @@ function filterLowStockProducts() {
     </div>
   `;
 
-  const filtered = lowStockItems.filter(p => 
+  const filtered = query ? lowStockItems.filter(p => 
     (p.name && p.name.toLowerCase().includes(query)) || 
     (p.code && p.code.toLowerCase().includes(query))
-  );
+  ) : lowStockItems;
 
   filtered.forEach(p => {
     html += `
-      <div onclick="selectLowStockProduct(${p.id}, '${p.name.replace(/'/g, "\\'")} (Stock: ${p.stock})')" class="p-2.5 text-xs text-slate-200 hover:bg-rose-600 hover:text-white cursor-pointer transition truncate">
+      <div onclick="selectLowStockProduct(${p.id}, '${p.name.replace(/'/g, "\\'")} (${p.stock} un.)')" class="p-2.5 text-xs text-slate-200 hover:bg-rose-600 hover:text-white cursor-pointer transition truncate">
         ${p.name} <span class="font-bold text-rose-400">(${p.stock} un.)</span>
       </div>
     `;
@@ -321,7 +311,67 @@ function updateProductValueFilter() {
   renderChart();
 }
 
-// MÓDULO DE PETICIONES Y SUGERENCIAS
+// HISTORIAL Y SUS FILTROS AVANZADOS (FECHA, TIPO Y BÚSQUEDA)
+function applyMovementFilters() {
+  const query = document.getElementById("mov-filter-search").value.toLowerCase().trim();
+  const typeFilter = document.getElementById("mov-filter-type").value;
+  const startDate = document.getElementById("mov-filter-date-start").value;
+  const endDate = document.getElementById("mov-filter-date-end").value;
+
+  const filtered = movements.filter(m => {
+    const matchesQuery = !query || 
+      (m.product_name && m.product_name.toLowerCase().includes(query)) || 
+      (m.user_role && m.user_role.toLowerCase().includes(query)) ||
+      (m.comment && m.comment.toLowerCase().includes(query));
+
+    const matchesType = (typeFilter === 'ALL') || (m.type === typeFilter);
+
+    const mDate = new Date(m.created_at).toISOString().split('T')[0];
+    const matchesStartDate = !startDate || (mDate >= startDate);
+    const matchesEndDate = !endDate || (mDate <= endDate);
+
+    return matchesQuery && matchesType && matchesStartDate && matchesEndDate;
+  });
+
+  renderMovements(filtered);
+}
+
+function renderMovements(customList = null) {
+  const list = customList || movements;
+  const tbody = document.getElementById('movements-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No se encontraron movimientos.</td></tr>`;
+    return;
+  }
+
+  list.forEach(m => {
+    const formattedDate = new Date(m.created_at).toLocaleString();
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition">
+        <td class="p-4 text-xs text-slate-400">${formattedDate}</td>
+        <td class="p-4">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${m.type === 'IN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+            ${m.type === 'IN' ? 'ENTRADA (+)' : 'SALIDA (-)'}
+          </span>
+        </td>
+        <td class="p-4 font-medium text-white">${m.product_name}</td>
+        <td class="p-4 font-bold">${m.qty}</td>
+        <td class="p-4 text-slate-300 italic">${m.comment}</td>
+        <td class="p-4 text-xs text-indigo-400 font-semibold">${m.user_role}</td>
+        <td class="p-4">
+          ${isAdmin ? `<button onclick="deleteMovement(${m.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash mr-1"></i> Borrar</button>` : '<span class="text-xs text-slate-600">-</span>'}
+        </td>
+      </tr>
+    `;
+  });
+}
+
+// MÓDULO DE PETICIONES Y SUGERENCIAS CON FILTRADO
 async function fetchRequests() {
   if (!supabaseClient) return;
   let query = supabaseClient.from("requests").select("*").order("created_at", { ascending: false });
@@ -335,6 +385,16 @@ async function fetchRequests() {
     appRequests = data;
     renderRequests();
   }
+}
+
+function filterRequestsList() {
+  const query = document.getElementById("search-requests-input").value.toLowerCase().trim();
+  const filtered = appRequests.filter(r => 
+    (r.request_text && r.request_text.toLowerCase().includes(query)) ||
+    (r.username && r.username.toLowerCase().includes(query)) ||
+    (r.status && r.status.toLowerCase().includes(query))
+  );
+  renderRequests(filtered);
 }
 
 async function handleSendRequest(e) {
@@ -398,7 +458,8 @@ async function deleteRequest(requestId) {
   await fetchRequests();
 }
 
-function renderRequests() {
+function renderRequests(customList = null) {
+  const list = customList || appRequests;
   const tbody = document.getElementById("requests-table-body");
   const title = document.getElementById("requests-list-title");
   if (!tbody) return;
@@ -411,12 +472,12 @@ function renderRequests() {
     title.innerText = isAdmin ? "Todas las Peticiones de los Usuarios" : "Mis Peticiones Enviadas";
   }
 
-  if (appRequests.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No hay peticiones registradas.</td></tr>`;
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No se encontraron peticiones.</td></tr>`;
     return;
   }
 
-  appRequests.forEach(req => {
+  list.forEach(req => {
     const isDone = req.status === 'Hecha';
     const dateStr = new Date(req.created_at).toLocaleDateString();
 
@@ -960,33 +1021,4 @@ async function saveMovement() {
 
   closeMovementModal();
   document.getElementById('mov-comment').value = '';
-}
-
-function renderMovements() {
-  const tbody = document.getElementById('movements-table-body');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  const isAdmin = currentUser && currentUser.role === 'admin';
-
-  movements.forEach(m => {
-    const formattedDate = new Date(m.created_at).toLocaleString();
-    tbody.innerHTML += `
-      <tr class="hover:bg-slate-900 transition">
-        <td class="p-4 text-xs text-slate-400">${formattedDate}</td>
-        <td class="p-4">
-          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${m.type === 'IN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
-            ${m.type === 'IN' ? 'ENTRADA (+)' : 'SALIDA (-)'}
-          </span>
-        </td>
-        <td class="p-4 font-medium text-white">${m.product_name}</td>
-        <td class="p-4 font-bold">${m.qty}</td>
-        <td class="p-4 text-slate-300 italic">${m.comment}</td>
-        <td class="p-4 text-xs text-indigo-400 font-semibold">${m.user_role}</td>
-        <td class="p-4">
-          ${isAdmin ? `<button onclick="deleteMovement(${m.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash mr-1"></i> Borrar</button>` : '<span class="text-xs text-slate-600">-</span>'}
-        </td>
-      </tr>
-    `;
-  });
 }
