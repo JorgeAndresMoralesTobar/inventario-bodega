@@ -100,18 +100,24 @@ function applyRolePermissions() {
   const btnAddProduct = document.getElementById("btn-add-product");
   const btnAddDist = document.getElementById("btn-add-distributor");
 
+  // VISIBILIDAD DE PESTAÑA CONTACTOS (Solo Admin y Operador)
   if (currentUser.role === "admin" || currentUser.role === "operator") {
     if (navDistributors) navDistributors.classList.remove("hidden");
   } else {
     if (navDistributors) navDistributors.classList.add("hidden");
   }
 
+  // EDICIÓN EN CONTACTOS (SOLO ADMINISTRADOR)
+  if (currentUser.role === "admin") {
+    if (btnAddDist) btnAddDist.classList.remove("hidden");
+  } else {
+    if (btnAddDist) btnAddDist.classList.add("hidden");
+  }
+
   if (currentUser.role === "viewer") {
     if (btnMovement) btnMovement.classList.add("hidden");
-    if (btnAddDist) btnAddDist.classList.add("hidden");
   } else {
     if (btnMovement) btnMovement.classList.remove("hidden");
-    if (btnAddDist) btnAddDist.classList.remove("hidden");
   }
 
   if (currentUser.role === "admin") {
@@ -228,7 +234,7 @@ async function fetchUsers() {
   }
 }
 
-// CAMBIAR ROL DE USUARIO DINÁMICAMENTE DESDE LA TABLA
+// CAMBIAR ROL DE USUARIO
 async function changeUserRole(userId, newRole) {
   if (!currentUser || currentUser.role !== 'admin') return;
 
@@ -319,7 +325,7 @@ async function deleteUser(userId) {
   }
 }
 
-// DISTRIBUIDORES / PROVEEDORES
+// CONTACTOS / DISTRIBUIDORES
 async function fetchDistributors() {
   if (!supabaseClient) return;
   const { data, error } = await supabaseClient.from("distributors").select("*").order("id", { ascending: true });
@@ -357,10 +363,9 @@ function renderDistributors(customList = null) {
   tbody.innerHTML = "";
 
   const isAdmin = currentUser && currentUser.role === 'admin';
-  const canEdit = currentUser && currentUser.role !== 'viewer';
 
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No se encontraron distribuidores.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No se encontraron contactos.</td></tr>`;
     return;
   }
 
@@ -392,9 +397,10 @@ function renderDistributors(customList = null) {
         <td class="p-4 text-slate-300">${d.municipality || '-'}</td>
         <td class="p-4 text-xs text-slate-400">${d.notes || d.email || '-'}</td>
         <td class="p-4 flex gap-3">
-          ${canEdit ? `<button onclick="openEditDistributorModal(${d.id})" class="text-amber-400 hover:text-amber-300 text-xs font-semibold"><i class="fa-solid fa-pen"></i> Editar</button>` : ''}
-          ${isAdmin ? `<button onclick="deleteDistributor(${d.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash"></i> Eliminar</button>` : ''}
-          ${!canEdit && !isAdmin ? '<span class="text-xs text-slate-600">Solo lectura</span>' : ''}
+          ${isAdmin ? `
+            <button onclick="openEditDistributorModal(${d.id})" class="text-amber-400 hover:text-amber-300 text-xs font-semibold"><i class="fa-solid fa-pen"></i> Editar</button>
+            <button onclick="deleteDistributor(${d.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash"></i> Eliminar</button>
+          ` : '<span class="text-xs text-slate-600">Solo lectura</span>'}
         </td>
       </tr>
     `;
@@ -402,8 +408,8 @@ function renderDistributors(customList = null) {
 }
 
 function openAddDistributorModal() {
-  if (!currentUser || currentUser.role === 'viewer') return;
-  document.getElementById("dist-modal-title").innerText = "Añadir Distribuidor";
+  if (!currentUser || currentUser.role !== 'admin') return;
+  document.getElementById("dist-modal-title").innerText = "Añadir Contacto";
   document.getElementById("dist-id").value = "";
   document.getElementById("dist-category").value = "PROVEEDORES";
   document.getElementById("dist-name").value = "";
@@ -415,11 +421,11 @@ function openAddDistributorModal() {
 }
 
 function openEditDistributorModal(distId) {
-  if (!currentUser || currentUser.role === 'viewer') return;
+  if (!currentUser || currentUser.role !== 'admin') return;
   const d = distributors.find(item => item.id === distId);
   if (!d) return;
 
-  document.getElementById("dist-modal-title").innerText = "Editar Distribuidor";
+  document.getElementById("dist-modal-title").innerText = "Editar Contacto";
   document.getElementById("dist-id").value = d.id;
   document.getElementById("dist-category").value = d.category || "PROVEEDORES";
   document.getElementById("dist-name").value = d.name;
@@ -435,7 +441,7 @@ function closeDistributorModal() {
 }
 
 async function saveDistributor() {
-  if (!supabaseClient || currentUser.role === 'viewer') return;
+  if (!supabaseClient || currentUser.role !== 'admin') return;
 
   const id = document.getElementById("dist-id").value;
   const category = document.getElementById("dist-category").value;
@@ -445,7 +451,7 @@ async function saveDistributor() {
   const notes = document.getElementById("dist-notes").value.trim();
 
   if (!name) {
-    alert("⚠️ El nombre del distribuidor es obligatorio.");
+    alert("⚠️ El nombre del contacto es obligatorio.");
     return;
   }
 
@@ -456,7 +462,7 @@ async function saveDistributor() {
       .eq("id", parseInt(id));
 
     if (error) {
-      alert("Error al actualizar distribuidor: " + error.message);
+      alert("Error al actualizar contacto: " + error.message);
       return;
     }
   } else {
@@ -465,7 +471,7 @@ async function saveDistributor() {
       .insert([{ category, name, phone, municipality, notes }]);
 
     if (error) {
-      alert("Error al guardar distribuidor: " + error.message);
+      alert("Error al guardar contacto: " + error.message);
       return;
     }
   }
@@ -477,11 +483,11 @@ async function saveDistributor() {
 async function deleteDistributor(distId) {
   if (!currentUser || currentUser.role !== 'admin') return;
 
-  if (!confirm("¿Seguro que deseas eliminar este distribuidor?")) return;
+  if (!confirm("¿Seguro que deseas eliminar este contacto?")) return;
 
   const { error } = await supabaseClient.from("distributors").delete().eq("id", distId);
   if (error) {
-    alert("Error al eliminar distribuidor: " + error.message);
+    alert("Error al eliminar contacto: " + error.message);
     return;
   }
 

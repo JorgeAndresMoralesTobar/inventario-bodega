@@ -77,9 +77,9 @@
             <i class="fa-solid fa-arrow-right-arrow-left w-5"></i> Historial
           </button>
 
-          <!-- PESTAÑA DISTRIBUIDORES (Controlada por permisos: Admin y Operador) -->
+          <!-- PESTAÑA CONTACTOS (Visibilidad para Admin y Operador) -->
           <button onclick="switchTab('distributors')" id="nav-distributors" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium hidden">
-            <i class="fa-solid fa-truck-field w-5"></i> Distribuidores
+            <i class="fa-solid fa-address-book w-5"></i> Contactos
           </button>
 
           <button onclick="switchTab('requests')" id="nav-requests" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
@@ -291,7 +291,7 @@
         </div>
       </div>
 
-      <!-- TAB DISTRIBUIDORES / PROVEEDORES -->
+      <!-- TAB CONTACTOS -->
       <div id="tab-distributors" class="tab-content hidden space-y-6">
         <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
           <div>
@@ -312,8 +312,9 @@
             <input type="text" id="dist-filter-municipality" oninput="applyDistributorFilters()" placeholder="🔍 Municipio..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
           </div>
           <div class="flex items-end">
-            <button onclick="openAddDistributorModal()" id="btn-add-distributor" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold p-3 rounded-xl transition shadow-lg shadow-amber-600/30 flex items-center justify-center gap-2">
-              <i class="fa-solid fa-user-plus"></i> Nuevo Distribuidor
+            <!-- Botón solo visible para Administrador -->
+            <button onclick="openAddDistributorModal()" id="btn-add-distributor" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold p-3 rounded-xl transition shadow-lg shadow-amber-600/30 flex items-center justify-center gap-2 hidden">
+              <i class="fa-solid fa-user-plus"></i> Nuevo Contacto
             </button>
           </div>
         </div>
@@ -419,10 +420,10 @@
     </main>
   </div>
 
-  <!-- MODAL DISTRIBUIDOR (CREAR/EDITAR) -->
+  <!-- MODAL CONTACTO (CREAR/EDITAR) -->
   <div id="distributor-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
     <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
-      <h3 class="text-xl font-bold text-white" id="dist-modal-title">Añadir Distribuidor</h3>
+      <h3 class="text-xl font-bold text-white" id="dist-modal-title">Añadir Contacto</h3>
       <input type="hidden" id="dist-id">
 
       <div>
