@@ -225,10 +225,10 @@ async function fetchProducts() {
   if (!supabaseClient) return;
   const { data, error } = await supabaseClient.from("products").select("*").order("id", { ascending: true });
   if (!error && data) {
-    // Garantiza que use el campo 'name' o 'productos' tal como viene de la base de datos
-    products = data.map(item => ({
-      ...item,
-      name: item.name || item.productos || item.PRODUCTOS || ''
+    products = data.map(p => ({
+      ...p,
+      // Si el campo viene como PRODUCTOS o productos lo asigna a name automáticamente
+      name: p.name || p.PRODUCTOS || p.productos || ''
     }));
     renderDashboard();
     renderProducts();
