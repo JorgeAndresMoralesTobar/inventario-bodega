@@ -1029,18 +1029,23 @@ function renderProducts(filteredList = null) {
   if (!tbody) return;
   tbody.innerHTML = '';
 
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No se encontraron productos.</td></tr>`;
+    return;
+  }
+
   list.forEach(p => {
     const stock = Number(p.stock) || 0;
-    const minStock = Number(p.min_stock) || 0;
+    const minStock = Number(p.min_stock) || 5;
     const canMove = currentUser && (currentUser.role === 'admin' || currentUser.role === 'operator');
     const isAdmin = currentUser && currentUser.role === 'admin';
 
-    const salePrice = Number(p.sale_price || 0);
-    // Cálculo automático por fórmula: Precio Venta * 1.19
-    const salePriceVat = Number(p.sale_price_vat || (salePrice * 1.19));
+    const salePrice = Number(p.sale_price) || 0;
+    // Cálculo seguro del Precio Venta + IVA (19%)
+    const salePriceVat = salePrice * 1.19;
 
     tbody.innerHTML += `
-      <tr class="hover:bg-slate-900 transition">
+      <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
         <td class="p-4 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
         <td class="p-4 font-medium text-white">${p.name || ''}</td>
         <td class="p-4">
