@@ -36,6 +36,16 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+// CÁLCULO DE IVA EN TIEMPO REAL
+function updateVatPreview(priceInputId, vatDisplayId) {
+  const priceVal = parseFloat(document.getElementById(priceInputId).value) || 0;
+  const vatPrice = priceVal * 1.19;
+  const displayElement = document.getElementById(vatDisplayId);
+  if (displayElement) {
+    displayElement.value = vatPrice.toFixed(2);
+  }
+}
+
 // LOGIN Y SESIÓN
 async function handleLogin(e) {
   e.preventDefault();
@@ -100,14 +110,12 @@ function applyRolePermissions() {
   const btnAddProduct = document.getElementById("btn-add-product");
   const btnAddDist = document.getElementById("btn-add-distributor");
 
-  // VISIBILIDAD DE PESTAÑA CONTACTOS (Solo Admin y Operador)
   if (currentUser.role === "admin" || currentUser.role === "operator") {
     if (navDistributors) navDistributors.classList.remove("hidden");
   } else {
     if (navDistributors) navDistributors.classList.add("hidden");
   }
 
-  // EDICIÓN EN CONTACTOS (SOLO ADMINISTRADOR)
   if (currentUser.role === "admin") {
     if (btnAddDist) btnAddDist.classList.remove("hidden");
   } else {
@@ -1014,7 +1022,7 @@ function renderChart() {
   });
 }
 
-// RENDER TABLA PRODUCTOS (MOSTRANDO PRECIO DE VENTA SIN IVA Y CON IVA)
+// RENDER TABLA PRODUCTOS
 function renderProducts(filteredList = null) {
   const list = filteredList || products;
   const tbody = document.getElementById('inventory-table-body');
@@ -1027,8 +1035,8 @@ function renderProducts(filteredList = null) {
     const canMove = currentUser && (currentUser.role === 'admin' || currentUser.role === 'operator');
     const isAdmin = currentUser && currentUser.role === 'admin';
 
-    // Cálculo automático del precio con IVA en caso de que solo exista el precio base en la BD
     const salePrice = Number(p.sale_price || 0);
+    // Cálculo automático por fórmula: Precio Venta * 1.19
     const salePriceVat = Number(p.sale_price_vat || (salePrice * 1.19));
 
     tbody.innerHTML += `
@@ -1074,6 +1082,7 @@ function openAddProductModal() {
   document.getElementById('add-product-stock').value = 0;
   document.getElementById('add-purchase-price').value = 0;
   document.getElementById('add-sale-price').value = 0;
+  document.getElementById('add-sale-price-vat').value = '0.00';
 
   document.getElementById('add-product-modal').classList.remove('hidden');
 }
@@ -1090,7 +1099,9 @@ async function saveNewProduct() {
   const stock = parseInt(document.getElementById('add-product-stock').value) || 0;
   const purchasePrice = parseFloat(document.getElementById('add-purchase-price').value) || 0;
   const salePrice = parseFloat(document.getElementById('add-sale-price').value) || 0;
-  const salePriceVat = salePrice * 1.19;
+  
+  // Cálculo automático del Precio con IVA (Venta * 1.19)
+  const salePriceVat = Number((salePrice * 1.19).toFixed(2));
 
   if (!name) {
     alert("⚠️ Debes asignar un nombre al nuevo producto.");
@@ -1141,11 +1152,15 @@ function openEditProductModal(productId) {
   const product = products.find(p => p.id === productId);
   if (!product) return;
 
+  const salePrice = Number(product.sale_price || 0);
+  const salePriceVat = Number(product.sale_price_vat || (salePrice * 1.19));
+
   document.getElementById('edit-product-id').value = product.id;
   document.getElementById('edit-product-name').value = product.name;
   document.getElementById('edit-product-stock').value = product.stock;
   document.getElementById('edit-purchase-price').value = product.purchase_price;
-  document.getElementById('edit-sale-price').value = product.sale_price;
+  document.getElementById('edit-sale-price').value = salePrice;
+  document.getElementById('edit-sale-price-vat').value = salePriceVat.toFixed(2);
 
   document.getElementById('edit-product-modal').classList.remove('hidden');
 }
@@ -1160,9 +1175,11 @@ async function saveProductEdit() {
   const productId = parseInt(document.getElementById('edit-product-id').value);
   const newName = document.getElementById('edit-product-name').value.trim();
   const newStock = parseInt(document.getElementById('edit-product-stock').value);
-  const newPurchasePrice = parseFloat(document.getElementById('edit-purchase-price').value);
-  const newSalePrice = parseFloat(document.getElementById('edit-sale-price').value);
-  const newSalePriceVat = newSalePrice * 1.19;
+  const newPurchasePrice = parseFloat(document.getElementById('edit-purchase-price').value) || 0;
+  const newSalePrice = parseFloat(document.getElementById('edit-sale-price').value) || 0;
+  
+  // Cálculo automático del Precio con IVA (Venta * 1.19)
+  const newSalePriceVat = Number((newSalePrice * 1.19).toFixed(2));
 
   if (!newName) {
     alert("⚠️ El nombre del producto no puede estar vacío.");
