@@ -1014,7 +1014,7 @@ function renderChart() {
   });
 }
 
-// RENDER TABLA PRODUCTOS
+// RENDER TABLA PRODUCTOS (MOSTRANDO PRECIO DE VENTA SIN IVA Y CON IVA)
 function renderProducts(filteredList = null) {
   const list = filteredList || products;
   const tbody = document.getElementById('inventory-table-body');
@@ -1027,6 +1027,10 @@ function renderProducts(filteredList = null) {
     const canMove = currentUser && (currentUser.role === 'admin' || currentUser.role === 'operator');
     const isAdmin = currentUser && currentUser.role === 'admin';
 
+    // Cálculo automático del precio con IVA en caso de que solo exista el precio base en la BD
+    const salePrice = Number(p.sale_price || 0);
+    const salePriceVat = Number(p.sale_price_vat || (salePrice * 1.19));
+
     tbody.innerHTML += `
       <tr class="hover:bg-slate-900 transition">
         <td class="p-4 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
@@ -1037,7 +1041,8 @@ function renderProducts(filteredList = null) {
           </span>
         </td>
         <td class="p-4">$${Number(p.purchase_price || 0).toLocaleString()}</td>
-        <td class="p-4">$${Number(p.sale_price || 0).toLocaleString()}</td>
+        <td class="p-4 font-semibold text-amber-400">$${salePrice.toLocaleString()}</td>
+        <td class="p-4 font-bold text-emerald-400">$${salePriceVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td class="p-4 flex gap-3">
           ${canMove ? `<button onclick="openMovementModalWithProduct(${p.id})" class="text-indigo-400 hover:text-indigo-300 text-xs font-semibold">Mover Stock</button>` : ''}
           ${isAdmin ? `<button onclick="openEditProductModal(${p.id})" class="text-amber-400 hover:text-amber-300 text-xs font-semibold"><i class="fa-solid fa-pen"></i> Editar</button>` : ''}
@@ -1085,6 +1090,7 @@ async function saveNewProduct() {
   const stock = parseInt(document.getElementById('add-product-stock').value) || 0;
   const purchasePrice = parseFloat(document.getElementById('add-purchase-price').value) || 0;
   const salePrice = parseFloat(document.getElementById('add-sale-price').value) || 0;
+  const salePriceVat = salePrice * 1.19;
 
   if (!name) {
     alert("⚠️ Debes asignar un nombre al nuevo producto.");
@@ -1102,7 +1108,8 @@ async function saveNewProduct() {
       stock: stock,
       min_stock: 5,
       purchase_price: purchasePrice,
-      sale_price: salePrice
+      sale_price: salePrice,
+      sale_price_vat: salePriceVat
     }
   ]);
 
@@ -1155,6 +1162,7 @@ async function saveProductEdit() {
   const newStock = parseInt(document.getElementById('edit-product-stock').value);
   const newPurchasePrice = parseFloat(document.getElementById('edit-purchase-price').value);
   const newSalePrice = parseFloat(document.getElementById('edit-sale-price').value);
+  const newSalePriceVat = newSalePrice * 1.19;
 
   if (!newName) {
     alert("⚠️ El nombre del producto no puede estar vacío.");
@@ -1167,7 +1175,8 @@ async function saveProductEdit() {
       name: newName,
       stock: newStock,
       purchase_price: newPurchasePrice,
-      sale_price: newSalePrice
+      sale_price: newSalePrice,
+      sale_price_vat: newSalePriceVat
     })
     .eq('id', productId);
 
