@@ -3,541 +3,648 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestión de Inventario</title>
+  <title>Sistema de Control de Inventario - Bodega</title>
+  
+  <!-- Estilos base y Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- SDK oficial de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    .active-nav {
-      background-color: rgba(99, 102, 241, 0.1);
-      color: #818cf8;
-      border-left: 4px solid #6366f1;
-    }
-  </style>
+  <!-- Chart.js para gráficos interactivos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen">
 
   <!-- PANTALLA DE LOGIN -->
-  <div id="login-screen" class="flex items-center justify-center min-h-screen p-4">
-    <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
-      <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-400 mb-4 border border-indigo-500/20">
-          <i class="fa-solid fa-boxes-stacked text-2xl"></i>
+  <div id="login-screen" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl space-y-6">
+      <div class="text-center space-y-2">
+        <div class="inline-flex bg-indigo-600 text-white p-4 rounded-2xl shadow-lg shadow-indigo-500/30 mb-2">
+          <i class="fa-solid fa-boxes-stacked text-3xl"></i>
         </div>
-        <h1 class="text-2xl font-bold text-white">Gestión de Inventario</h1>
-        <p class="text-slate-400 text-sm mt-1">Inicia sesión para acceder al sistema</p>
+        <h2 class="text-2xl font-bold text-white">Acceso al Inventario</h2>
+        <p class="text-xs text-slate-400">Ingresa tus credenciales para continuar</p>
       </div>
 
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">USUARIO</label>
-          <input type="text" id="login-username" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500 transition">
+          <input type="text" id="login-username" required placeholder="Ej: admin" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">CONTRASEÑA</label>
-          <input type="password" id="login-password" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-indigo-500 transition">
+          <input type="password" id="login-password" required placeholder="••••••••" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
         </div>
-        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-indigo-600/20 text-sm mt-2">
+
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold p-3 rounded-xl shadow-lg shadow-indigo-600/30 transition">
           Iniciar Sesión
         </button>
       </form>
     </div>
   </div>
 
-  <!-- PANTALLA PRINCIPAL -->
-  <div id="app-screen" class="hidden min-h-screen flex flex-col md:flex-row">
+  <!-- APLICACIÓN PRINCIPAL -->
+  <div id="app-screen" class="hidden flex min-h-screen">
     
-    <!-- BARRA LATERAL -->
-    <aside class="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between">
+    <!-- Panel Lateral / Sidebar -->
+    <aside class="w-64 bg-slate-950 border-r border-slate-800 p-6 flex flex-col justify-between hidden md:flex">
       <div>
-        <div class="p-6 border-b border-slate-800 flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold">
-            <i class="fa-solid fa-cubes"></i>
+        <div class="flex items-center gap-3 mb-8">
+          <div class="bg-indigo-600 text-white p-3 rounded-xl shadow-lg shadow-indigo-500/30">
+            <i class="fa-solid fa-boxes-stacked text-xl"></i>
           </div>
           <div>
-            <h2 class="font-bold text-white text-sm">INVENTARIO</h2>
-            <span class="text-xs text-slate-400">Sistema de Control</span>
+            <h1 class="font-bold text-lg text-white">INVENTARIO</h1>
+            <span class="text-xs text-indigo-400 font-medium">Control de Bodega</span>
           </div>
         </div>
 
-        <nav class="p-4 space-y-1">
-          <button id="nav-dashboard" onclick="switchTab('dashboard')" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-3 transition hover:bg-slate-800 text-slate-400 active-nav">
-            <i class="fa-solid fa-chart-line w-5"></i> Panel General
+        <nav class="space-y-2">
+          <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium active-nav">
+            <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
           </button>
-          <button id="nav-inventory" onclick="switchTab('inventory')" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-3 transition hover:bg-slate-800 text-slate-400">
-            <i class="fa-solid fa-box w-5"></i> Productos
+          
+          <button onclick="switchTab('inventory')" id="nav-inventory" class="w-full flex items-center justify-between px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
+            <div class="flex items-center gap-3 whitespace-nowrap">
+              <i class="fa-solid fa-box w-5"></i> Productos
+            </div>
+            <span class="text-xs font-bold bg-slate-800 text-indigo-400 px-2 py-0.5 rounded-md border border-slate-700" id="total-count-badge">0</span>
           </button>
-          <button id="nav-movements" onclick="switchTab('movements')" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-3 transition hover:bg-slate-800 text-slate-400">
+
+          <button onclick="switchTab('movements')" id="nav-movements" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
             <i class="fa-solid fa-arrow-right-arrow-left w-5"></i> Historial
           </button>
-          <button id="nav-requests" onclick="switchTab('requests')" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-3 transition hover:bg-slate-800 text-slate-400">
-            <i class="fa-solid fa-paper-plane w-5"></i> Peticiones
-          </button>
-          <button id="nav-distributors" onclick="switchTab('distributors')" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-3 transition hover:bg-slate-800 text-slate-400 hidden">
+
+          <!-- PESTAÑA CONTACTOS (Visibilidad para Admin y Operador) -->
+          <button onclick="switchTab('distributors')" id="nav-distributors" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium hidden">
             <i class="fa-solid fa-address-book w-5"></i> Contactos
           </button>
-          <button id="nav-users" onclick="switchTab('users')" class="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-3 transition hover:bg-slate-800 text-slate-400 hidden">
-            <i class="fa-solid fa-users w-5"></i> Usuarios
+
+          <button onclick="switchTab('requests')" id="nav-requests" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
+            <i class="fa-solid fa-comment-dots w-5"></i> Peticiones
+          </button>
+
+          <button onclick="switchTab('users')" id="nav-users" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium hidden">
+            <i class="fa-solid fa-users-gear w-5"></i> Gestión Usuarios
           </button>
         </nav>
       </div>
 
-      <!-- PERFIL DE USUARIO Y PERMISOS -->
-      <div class="p-4 border-t border-slate-800 space-y-2">
-        <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
-          <div>
-            <div id="user-display-name" class="font-bold text-xs text-white">@usuario</div>
-            <div id="user-display-role" class="text-[10px] font-bold uppercase text-indigo-400">ADMIN</div>
-          </div>
-          <button onclick="openChangePasswordModal()" title="Cambiar Contraseña" class="text-slate-400 hover:text-white text-xs p-1">
-            <i class="fa-solid fa-key"></i>
+      <!-- Perfil de usuario y Opciones -->
+      <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <p id="user-display-name" class="text-sm font-bold text-white"></p>
+          <p id="user-display-role" class="text-xs text-indigo-400 font-semibold uppercase"></p>
+        </div>
+        <div class="flex items-center gap-1">
+          <button onclick="openChangePasswordModal()" title="Cambiar Contraseña" class="text-slate-400 hover:text-amber-400 transition p-2">
+            <i class="fa-solid fa-key text-base"></i>
+          </button>
+          <button onclick="handleLogout()" title="Cerrar Sesión" class="text-slate-400 hover:text-rose-400 transition p-2">
+            <i class="fa-solid fa-right-from-bracket text-base"></i>
           </button>
         </div>
-        <button onclick="handleLogout()" class="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-semibold py-2 rounded-xl text-xs transition border border-rose-500/20">
-          <i class="fa-solid fa-right-from-bracket mr-2"></i> Cerrar Sesión
-        </button>
       </div>
     </aside>
 
-    <!-- CONTENIDO PRINCIPAL -->
-    <main class="flex-1 p-6 md:p-10 overflow-y-auto">
-
-      <!-- PESTAÑA: PANEL GENERAL -->
-      <section id="tab-dashboard" class="tab-content space-y-6">
-        <div class="flex justify-between items-center">
-          <h2 class="text-2xl font-bold text-white">Panel General</h2>
-          <button id="btn-new-movement" onclick="openMovementModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition shadow-lg shadow-indigo-600/20">
-            <i class="fa-solid fa-plus mr-2"></i> Registrar Movimiento
+    <!-- Contenido Principal -->
+    <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+      <!-- Header -->
+      <header class="flex justify-between items-center mb-8 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+        <div>
+          <h2 id="page-title" class="text-2xl font-bold text-white">Panel Principal</h2>
+          <p class="text-sm text-slate-400">Estado general y movimientos en tiempo real</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <button onclick="openMovementModal()" id="btn-new-movement" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition">
+            <i class="fa-solid fa-plus"></i> Registrar Entrada / Salida
           </button>
         </div>
+      </header>
 
-        <!-- TARJETAS DE ESTADÍSTICAS -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-            <span class="text-xs font-semibold text-slate-400">TOTAL PRODUCTOS</span>
-            <div id="stat-total-products" class="text-2xl font-bold text-white mt-2">0</div>
+      <!-- Tab 1: Dashboard -->
+      <div id="tab-dashboard" class="tab-content space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+            <p class="text-slate-400 text-sm font-medium">Total Productos</p>
+            <h3 id="stat-total-products" class="text-3xl font-extrabold text-white mt-1">0</h3>
           </div>
 
-          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl relative">
-            <span class="text-xs font-semibold text-slate-400">UNIDADES EN STOCK</span>
-            <div id="stat-total-units" class="text-2xl font-bold text-indigo-400 mt-2">0</div>
-            <div class="mt-2 relative">
-              <input type="text" id="select-units-filter-search" oninput="filterUnitsProducts()" onclick="filterUnitsProducts(true)" placeholder="🔍 Filtrar..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-white">
-              <input type="hidden" id="select-units-filter-id" value="all">
-              <div id="select-units-filter-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-800 rounded-lg max-h-40 overflow-y-auto z-20 shadow-xl"></div>
+          <!-- Tarjeta Unidades en Stock -->
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
+            <div>
+              <p class="text-slate-400 text-sm font-medium mb-1">Unidades en Stock</p>
+              <div class="relative">
+                <input 
+                  type="text" 
+                  id="select-units-filter-search" 
+                  onfocus="filterUnitsProducts(true)"
+                  oninput="filterUnitsProducts(false)" 
+                  placeholder="📦 Todas las unidades (Total)" 
+                  value="📦 Todas las unidades (Total)"
+                  autocomplete="off"
+                  class="w-full bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:border-indigo-500 truncate cursor-pointer"
+                >
+                <input type="hidden" id="select-units-filter-id" value="all">
+                <div id="select-units-filter-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
+              </div>
             </div>
+            <h3 id="stat-total-units" class="text-2xl md:text-3xl font-extrabold text-indigo-400 truncate">0</h3>
+          </div>
+          
+          <!-- Tarjeta Valor Inventario -->
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
+            <div>
+              <p class="text-slate-400 text-sm font-medium mb-1">Valor Inventario</p>
+              <div class="relative">
+                <input 
+                  type="text" 
+                  id="select-product-filter-search" 
+                  onfocus="filterValuationProducts(true)"
+                  oninput="filterValuationProducts(false)" 
+                  placeholder="📦 Todos los productos (Total)" 
+                  value="📦 Todos los productos (Total)"
+                  autocomplete="off"
+                  class="w-full bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:border-emerald-500 truncate cursor-pointer"
+                >
+                <input type="hidden" id="select-product-filter-id" value="all">
+                <div id="select-product-filter-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
+              </div>
+            </div>
+            <h3 id="stat-total-value" class="text-2xl md:text-3xl font-extrabold text-emerald-400 truncate">$0</h3>
           </div>
 
-          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl relative">
-            <span class="text-xs font-semibold text-slate-400">VALOR TOTAL DE COMPRA</span>
-            <div id="stat-total-value" class="text-2xl font-bold text-emerald-400 mt-2">$0</div>
-            <div class="mt-2 relative">
-              <input type="text" id="select-product-filter-search" oninput="filterValuationProducts()" onclick="filterValuationProducts(true)" placeholder="🔍 Filtrar..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-white">
-              <input type="hidden" id="select-product-filter-id" value="all">
-              <div id="select-product-filter-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-800 rounded-lg max-h-40 overflow-y-auto z-20 shadow-xl"></div>
+          <!-- Tarjeta Alertas Stock Bajo -->
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <p class="text-slate-400 text-sm font-medium">Alertas Stock Bajo</p>
+                <button onclick="openLowStockModal()" title="Ver lista completa" class="text-xs text-rose-400 hover:text-rose-300 font-semibold underline">
+                  Ver lista
+                </button>
+              </div>
+              <div class="relative">
+                <input 
+                  type="text" 
+                  id="select-low-stock-filter-search" 
+                  onfocus="filterLowStockProducts(true)"
+                  oninput="filterLowStockProducts(false)" 
+                  placeholder="⚠️ Mostrar todos los críticos" 
+                  value="⚠️ Mostrar todos los críticos"
+                  autocomplete="off"
+                  class="w-full bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:border-rose-500 truncate cursor-pointer"
+                >
+                <input type="hidden" id="select-low-stock-filter-id" value="all">
+                <div id="select-low-stock-filter-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
+              </div>
             </div>
-          </div>
-
-          <div onclick="openLowStockModal()" class="bg-slate-900 border border-rose-500/20 p-5 rounded-2xl cursor-pointer hover:border-rose-500/50 transition">
-            <span class="text-xs font-semibold text-rose-400">STOCK CRÍTICO</span>
-            <div id="stat-low-stock" class="text-2xl font-bold text-rose-400 mt-2">0</div>
-            <div class="mt-2 text-[10px] text-slate-400 flex items-center gap-1">
-              <i class="fa-solid fa-triangle-exclamation text-rose-400"></i> Ver detalles
-            </div>
+            <h3 id="stat-low-stock" class="text-2xl md:text-3xl font-extrabold text-rose-500 truncate">0</h3>
           </div>
         </div>
 
-        <!-- GRÁFICO -->
-        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-          <h3 id="chart-title" class="font-bold text-white text-sm mb-4">Evolución del Valor del Inventario (Total)</h3>
-          <div class="h-64">
+        <!-- GRÁFICO DE EVOLUCIÓN -->
+        <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h3 id="chart-title" class="text-lg font-bold text-white">Evolución del Valor del Inventario</h3>
+              <p class="text-xs text-slate-400">Proyección y seguimiento por semanas</p>
+            </div>
+            <span class="text-xs bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-full border border-indigo-500/20 font-semibold">
+              <i class="fa-solid fa-chart-line mr-1"></i> Tiempo Real
+            </span>
+          </div>
+          <div class="relative w-full h-72">
             <canvas id="valueTrendChart"></canvas>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- PESTAÑA: PRODUCTOS (TABLA DE INVENTARIO) -->
-      <section id="tab-inventory" class="tab-content space-y-6 hidden">
-        <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
+      <!-- Tab 2: Productos -->
+      <div id="tab-inventory" class="tab-content hidden space-y-6">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+          <input type="text" id="search-input" onkeyup="filterProducts()" placeholder="🔍 Buscar producto por nombre o código..." class="w-full md:w-96 bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500">
+          
+          <button onclick="openAddProductModal()" id="btn-add-product" class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition hidden">
+            <i class="fa-solid fa-square-plus"></i> Añadir Nuevo Producto
+          </button>
+        </div>
+
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+          <table class="w-full text-left text-slate-300">
+            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
+              <tr>
+                <th class="p-4">Código</th>
+                <th class="p-4">Producto</th>
+                <th class="p-4">Stock Actual</th>
+                <th class="p-4">Precio Compra Un.</th>
+                <th class="p-4">Precio Venta Un.</th>
+                <th class="p-4 text-emerald-400">PRE. VENT. + IVA</th>
+                <th class="p-4">OPCIONES</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab 3: Historial -->
+      <div id="tab-movements" class="tab-content hidden space-y-6">
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
           <div>
-            <h2 class="text-2xl font-bold text-white">Catálogo de Productos</h2>
-            <span class="text-xs text-slate-400">Mostrando <span id="total-count-badge">0</span> ítems registrados</span>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">BUSCAR (PRODUCTO / USUARIO)</label>
+            <input type="text" id="mov-filter-search" oninput="applyMovementFilters()" placeholder="🔍 Producto u operador..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
           </div>
-          <div class="flex gap-2">
-            <input type="text" id="search-input" oninput="filterProducts()" placeholder="Buscar producto..." class="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
-            <button id="btn-add-product" onclick="openAddProductModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition">
-              <i class="fa-solid fa-plus mr-1"></i> Añadir Producto
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">TIPO DE MOVIMIENTO</label>
+            <select id="mov-filter-type" onchange="applyMovementFilters()" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+              <option value="ALL">Todos los tipos</option>
+              <option value="IN">➕ Entradas (+)</option>
+              <option value="OUT">➖ Salidas (-)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">DESDE FECHA</label>
+            <input type="date" id="mov-filter-date-start" onchange="applyMovementFilters()" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">HASTA FECHA</label>
+            <input type="date" id="mov-filter-date-end" onchange="applyMovementFilters()" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+          <table class="w-full text-left text-slate-300">
+            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
+              <tr>
+                <th class="p-4">Fecha y Hora</th>
+                <th class="p-4">Tipo</th>
+                <th class="p-4">Producto</th>
+                <th class="p-4">Cantidad</th>
+                <th class="p-4">Comentario / Observación</th>
+                <th class="p-4">Usuario</th>
+                <th class="p-4">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="movements-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB CONTACTOS -->
+      <div id="tab-distributors" class="tab-content hidden space-y-6">
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">BUSCAR POR NOMBRE O TELÉFONO</label>
+            <input type="text" id="dist-filter-search" oninput="applyDistributorFilters()" placeholder="🔍 Nombre, teléfono..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">FILTRAR POR ACCIÓN / TIPO</label>
+            <select id="dist-filter-category" onchange="applyDistributorFilters()" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
+              <option value="ALL">Todas las acciones</option>
+              <option value="PROVEEDORES">PROVEEDORES</option>
+              <option value="ENVÍOS">ENVÍOS</option>
+              <option value="CONTADURÍA">CONTADURÍA</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">FILTRAR POR MUNICIPIO</label>
+            <input type="text" id="dist-filter-municipality" oninput="applyDistributorFilters()" placeholder="🔍 Municipio..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
+          </div>
+          <div class="flex items-end">
+            <!-- Botón solo visible para Administrador -->
+            <button onclick="openAddDistributorModal()" id="btn-add-distributor" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold p-3 rounded-xl transition shadow-lg shadow-amber-600/30 flex items-center justify-center gap-2 hidden">
+              <i class="fa-solid fa-user-plus"></i> Nuevo Contacto
             </button>
           </div>
         </div>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
-              <thead class="bg-slate-950 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-800">
-                <tr>
-                  <th class="p-4">CÓDIGO</th>
-                  <th class="p-4">PRODUCTO</th>
-                  <th class="p-4">STOCK</th>
-                  <th class="p-4">PRECIO COMPRA</th>
-                  <th class="p-4">PRE. VENT. SIN IVA</th>
-                  <th class="p-4 text-emerald-400">PRE. VENT. + IVA</th>
-                  <th class="p-4">OPCIONES</th>
-                </tr>
-              </thead>
-              <tbody id="inventory-table-body" class="divide-y divide-slate-800/50">
-                <!-- Se renderiza desde app.js -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- PESTAÑA: HISTORIAL -->
-      <section id="tab-movements" class="tab-content space-y-6 hidden">
-        <h2 class="text-2xl font-bold text-white">Historial de Movimientos</h2>
-        <div class="flex flex-wrap gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <input type="text" id="mov-filter-search" oninput="applyMovementFilters()" placeholder="Buscar..." class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-          <select id="mov-filter-type" onchange="applyMovementFilters()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-            <option value="ALL">Todos los Tipos</option>
-            <option value="IN">Entradas (+)</option>
-            <option value="OUT">Salidas (-)</option>
-          </select>
-          <input type="date" id="mov-filter-date-start" onchange="applyMovementFilters()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-          <input type="date" id="mov-filter-date-end" onchange="applyMovementFilters()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-        </div>
-
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-950 text-slate-400 text-xs font-bold uppercase border-b border-slate-800">
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+          <table class="w-full text-left text-slate-300">
+            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
               <tr>
-                <th class="p-4">FECHA</th>
-                <th class="p-4">TIPO</th>
-                <th class="p-4">PRODUCTO</th>
-                <th class="p-4">CANTIDAD</th>
-                <th class="p-4">MOTIVO / COMENTARIO</th>
-                <th class="p-4">REGISTRADO POR</th>
-                <th class="p-4">OPCIONES</th>
+                <th class="p-4">Acción / Tipo</th>
+                <th class="p-4">Nombre Completo</th>
+                <th class="p-4">Contacto / Teléfono</th>
+                <th class="p-4">Municipio / Dirección</th>
+                <th class="p-4">Email / Notas</th>
+                <th class="p-4">Acciones</th>
               </tr>
             </thead>
-            <tbody id="movements-table-body" class="divide-y divide-slate-800/50"></tbody>
+            <tbody id="distributors-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
           </table>
         </div>
-      </section>
+      </div>
 
-      <!-- PESTAÑA: PETICIONES -->
-      <section id="tab-requests" class="tab-content space-y-6 hidden">
-        <h2 class="text-2xl font-bold text-white">Peticiones y Sugerencias</h2>
-        <form onsubmit="handleSendRequest(event)" class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-          <label class="block text-xs font-semibold text-slate-400">NUEVA PETICIÓN</label>
-          <textarea id="request-input" rows="3" required placeholder="Escribe tu sugerencia, solicitud de nuevo producto o cambio..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"></textarea>
-          <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition">
-            Enviar Petición
-          </button>
-        </form>
+      <!-- Tab 4: Peticiones -->
+      <div id="tab-requests" class="tab-content hidden space-y-6">
+        <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
+          <h3 class="text-lg font-bold text-white">Enviar Petición o Sugerencia</h3>
+          <form onsubmit="handleSendRequest(event)" class="flex flex-col md:flex-row gap-3">
+            <input type="text" id="request-input" required placeholder="Ej: Me gustaría cambiar el color del panel o agregar exportación a Excel..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-paper-plane"></i> Enviar Petición
+            </button>
+          </form>
+        </div>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <div class="p-4 border-b border-slate-800 flex justify-between items-center">
-            <h3 id="requests-list-title" class="font-bold text-white text-sm">Historial de Peticiones</h3>
-            <input type="text" id="search-requests-input" oninput="filterRequestsList()" placeholder="Filtrar..." class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white">
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+          <div class="p-4 bg-slate-900/50 border-b border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+            <h4 class="font-bold text-white text-sm" id="requests-list-title">Lista de Peticiones</h4>
+            <input 
+              type="text" 
+              id="search-requests-input" 
+              onkeyup="filterRequestsList()" 
+              placeholder="🔍 Buscar en peticiones..." 
+              class="w-full md:w-72 bg-slate-900 border border-slate-800 text-white text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500"
+            >
           </div>
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-950 text-slate-400 text-xs font-bold uppercase border-b border-slate-800">
+          <table class="w-full text-left text-slate-300">
+            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
               <tr>
-                <th class="p-4">FECHA</th>
-                <th class="p-4">USUARIO</th>
-                <th class="p-4">MENSAJE</th>
-                <th class="p-4">ESTADO</th>
-                <th class="p-4">OPCIONES</th>
+                <th class="p-4">Fecha</th>
+                <th class="p-4">Usuario</th>
+                <th class="p-4">Detalle de la Petición</th>
+                <th class="p-4">Estado</th>
+                <th class="p-4">Acción</th>
               </tr>
             </thead>
-            <tbody id="requests-table-body" class="divide-y divide-slate-800/50"></tbody>
+            <tbody id="requests-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
           </table>
         </div>
-      </section>
+      </div>
 
-      <!-- PESTAÑA: CONTACTOS / DISTRIBUIDORES -->
-      <section id="tab-distributors" class="tab-content space-y-6 hidden">
+      <!-- Tab 5: Gestión Usuarios -->
+      <div id="tab-users" class="tab-content hidden space-y-6">
         <div class="flex justify-between items-center">
-          <h2 class="text-2xl font-bold text-white">Directorio de Contactos</h2>
-          <button id="btn-add-distributor" onclick="openAddDistributorModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition">
-            <i class="fa-solid fa-user-plus mr-2"></i> Añadir Contacto
-          </button>
+          <h3 class="text-lg font-bold text-white">Crear Nuevo Usuario</h3>
         </div>
-
-        <div class="flex flex-wrap gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <input type="text" id="dist-filter-search" oninput="applyDistributorFilters()" placeholder="Buscar..." class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-          <select id="dist-filter-category" onchange="applyDistributorFilters()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-            <option value="ALL">Todas las Categorías</option>
-            <option value="PROVEEDORES">PROVEEDORES</option>
-            <option value="ENVÍOS">ENVÍOS</option>
-            <option value="CONTADURÍA">CONTADURÍA</option>
-          </select>
-          <input type="text" id="dist-filter-municipality" oninput="applyDistributorFilters()" placeholder="Municipio..." class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
-        </div>
-
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-950 text-slate-400 text-xs font-bold uppercase border-b border-slate-800">
-              <tr>
-                <th class="p-4">CATEGORÍA</th>
-                <th class="p-4">NOMBRE</th>
-                <th class="p-4">TELÉFONO</th>
-                <th class="p-4">MUNICIPIO</th>
-                <th class="p-4">NOTAS / EMAIL</th>
-                <th class="p-4">OPCIONES</th>
-              </tr>
-            </thead>
-            <tbody id="distributors-table-body" class="divide-y divide-slate-800/50"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- PESTAÑA: USUARIOS -->
-      <section id="tab-users" class="tab-content space-y-6 hidden">
-        <h2 class="text-2xl font-bold text-white">Gestión de Usuarios</h2>
-        
-        <form onsubmit="handleCreateUser(event)" class="bg-slate-900 border border-slate-800 p-6 rounded-2xl grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <form onsubmit="handleCreateUser(event)" class="bg-slate-950 p-6 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">NUEVO USUARIO</label>
-            <input type="text" id="new-username" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white">
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Nombre de Usuario</label>
+            <input type="text" id="new-username" required placeholder="Ej: operador1" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">CONTRASEÑA</label>
-            <input type="password" id="new-password" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white">
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Contraseña</label>
+            <input type="password" id="new-password" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">ROL</label>
-            <select id="new-role" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white">
-              <option value="operator">OPERATOR</option>
-              <option value="viewer">VIEWER</option>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Rol de Acceso</label>
+            <select id="new-role" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
+              <option value="operator">👷 Operador (Movimientos)</option>
+              <option value="viewer">👁️ Consultor (Lectura)</option>
             </select>
           </div>
-          <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs transition">
-            Crear Usuario
-          </button>
+          <div class="flex items-end">
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold p-3 rounded-xl transition">
+              <i class="fa-solid fa-user-plus mr-1"></i> Crear Usuario
+            </button>
+          </div>
         </form>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-950 text-slate-400 text-xs font-bold uppercase border-b border-slate-800">
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+          <table class="w-full text-left text-slate-300">
+            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
               <tr>
-                <th class="p-4">USUARIO</th>
-                <th class="p-4">ROL</th>
-                <th class="p-4">FECHA CREACIÓN</th>
-                <th class="p-4">OPCIONES</th>
+                <th class="p-4">Usuario</th>
+                <th class="p-4">Rol</th>
+                <th class="p-4">Fecha Creación</th>
+                <th class="p-4">Acción</th>
               </tr>
             </thead>
-            <tbody id="users-table-body" class="divide-y divide-slate-800/50"></tbody>
+            <tbody id="users-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
           </table>
         </div>
-      </section>
+      </div>
 
     </main>
   </div>
 
-  <!-- MODALES DEL SISTEMA -->
-
-  <!-- MODAL: AÑADIR PRODUCTO -->
-  <div id="add-product-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
-      <h3 class="text-lg font-bold text-white">Añadir Nuevo Producto</h3>
-      
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CÓDIGO</label>
-        <input type="text" id="add-product-code" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE DEL PRODUCTO</label>
-        <input type="text" id="add-product-name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 mb-1">STOCK INICIAL</label>
-          <input type="number" id="add-product-stock" value="0" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 mb-1">PRECIO COMPRA</label>
-          <input type="number" step="0.01" id="add-purchase-price" value="0" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-        </div>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-semibold text-amber-400 mb-1">PRECIO VENTA</label>
-          <input type="number" step="0.01" id="add-sale-price" value="0" oninput="updateVatPreview('add-sale-price', 'add-sale-price-vat')" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-emerald-400 mb-1">PRE. VENT. + IVA (+19%)</label>
-          <input type="text" id="add-sale-price-vat" value="0.00" readonly disabled class="w-full bg-slate-950/50 border border-slate-800 rounded-xl p-2.5 text-sm text-emerald-400 font-bold cursor-not-allowed">
-        </div>
-      </div>
-
-      <div class="flex gap-3 pt-2">
-        <button onclick="closeAddProductModal()" class="w-1/2 bg-slate-800 text-slate-300 font-bold py-2.5 rounded-xl text-sm hover:bg-slate-700 transition">Cancelar</button>
-        <button onclick="saveNewProduct()" class="w-1/2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-sm transition">Guardar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: EDITAR PRODUCTO -->
-  <div id="edit-product-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
-      <h3 class="text-lg font-bold text-white">Editar Producto</h3>
-      <input type="hidden" id="edit-product-id">
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE DEL PRODUCTO</label>
-        <input type="text" id="edit-product-name" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 mb-1">STOCK</label>
-          <input type="number" id="edit-product-stock" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 mb-1">PRECIO COMPRA</label>
-          <input type="number" step="0.01" id="edit-purchase-price" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-        </div>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-semibold text-amber-400 mb-1">PRECIO VENTA</label>
-          <input type="number" step="0.01" id="edit-sale-price" oninput="updateVatPreview('edit-sale-price', 'edit-sale-price-vat')" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-emerald-400 mb-1">PRE. VENT. + IVA (+19%)</label>
-          <input type="text" id="edit-sale-price-vat" readonly disabled class="w-full bg-slate-950/50 border border-slate-800 rounded-xl p-2.5 text-sm text-emerald-400 font-bold cursor-not-allowed">
-        </div>
-      </div>
-
-      <div class="flex gap-3 pt-2">
-        <button onclick="closeEditProductModal()" class="w-1/2 bg-slate-800 text-slate-300 font-bold py-2.5 rounded-xl text-sm hover:bg-slate-700 transition">Cancelar</button>
-        <button onclick="saveProductEdit()" class="w-1/2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-sm transition">Actualizar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: REGISTRAR MOVIMIENTO -->
-  <div id="movement-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
-      <h3 class="text-lg font-bold text-white">Registrar Movimiento de Stock</h3>
-      
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">TIPO DE MOVIMIENTO</label>
-        <select id="mov-type" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-          <option value="IN">Entrada (+)</option>
-          <option value="OUT">Salida (-)</option>
-        </select>
-      </div>
-
-      <div class="relative">
-        <label class="block text-xs font-semibold text-slate-400 mb-1">SELECCIONAR PRODUCTO</label>
-        <input type="text" id="mov-product-search" oninput="filterModalProducts()" placeholder="Escribe para buscar..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-        <input type="hidden" id="mov-product-id">
-        <div id="mov-product-results" class="hidden absolute top-full left-0 right-0 mt-1 bg-slate-950 border border-slate-800 rounded-xl max-h-40 overflow-y-auto z-20 shadow-xl"></div>
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CANTIDAD</label>
-        <input type="number" id="mov-qty" value="1" min="1" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">COMENTARIO / OBSERVACIÓN *</label>
-        <input type="text" id="mov-comment" required placeholder="Motivo o referencia..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-
-      <div class="flex gap-3 pt-2">
-        <button onclick="closeMovementModal()" class="w-1/2 bg-slate-800 text-slate-300 font-bold py-2.5 rounded-xl text-sm hover:bg-slate-700 transition">Cancelar</button>
-        <button onclick="saveMovement()" class="w-1/2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-sm transition">Guardar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: CAMBIAR CONTRASEÑA -->
-  <div id="change-password-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-sm space-y-4">
-      <h3 class="text-lg font-bold text-white">Cambiar Contraseña</h3>
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CONTRASEÑA ACTUAL</label>
-        <input type="password" id="pass-current" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">NUEVA CONTRASEÑA</label>
-        <input type="password" id="pass-new" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CONFIRMAR NUEVA CONTRASEÑA</label>
-        <input type="password" id="pass-confirm" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-      <div class="flex gap-3 pt-2">
-        <button onclick="closeChangePasswordModal()" class="w-1/2 bg-slate-800 text-slate-300 font-bold py-2.5 rounded-xl text-sm hover:bg-slate-700 transition">Cancelar</button>
-        <button onclick="saveNewPassword()" class="w-1/2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-sm transition">Guardar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: DETALLES DE STOCK BAJO -->
-  <div id="low-stock-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-2xl space-y-4">
-      <div class="flex justify-between items-center">
-        <h3 class="text-lg font-bold text-rose-400 flex items-center gap-2">
-          <i class="fa-solid fa-triangle-exclamation"></i> Productos en Stock Crítico
-        </h3>
-        <button onclick="closeLowStockModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-      <div class="max-h-80 overflow-y-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-slate-950 text-slate-400 text-xs font-bold uppercase">
-            <tr>
-              <th class="p-3">CÓDIGO</th>
-              <th class="p-3">PRODUCTO</th>
-              <th class="p-3">STOCK ACTUAL</th>
-              <th class="p-3">STOCK MÍNIMO</th>
-              <th class="p-3">OPCIONES</th>
-            </tr>
-          </thead>
-          <tbody id="low-stock-modal-body" class="divide-y divide-slate-800"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: CONTACTOS -->
-  <div id="distributor-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4">
-      <h3 id="dist-modal-title" class="text-lg font-bold text-white">Añadir Contacto</h3>
+  <!-- MODAL CONTACTO (CREAR/EDITAR) -->
+  <div id="distributor-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
+      <h3 class="text-xl font-bold text-white" id="dist-modal-title">Añadir Contacto</h3>
       <input type="hidden" id="dist-id">
 
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CATEGORÍA</label>
-        <select id="dist-category" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
+        <label class="block text-xs font-semibold text-slate-400 mb-1">ACCIÓN / CATEGORÍA</label>
+        <select id="dist-category" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
           <option value="PROVEEDORES">PROVEEDORES</option>
           <option value="ENVÍOS">ENVÍOS</option>
           <option value="CONTADURÍA">CONTADURÍA</option>
         </select>
       </div>
+
       <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE DE CONTACTO *</label>
-        <input type="text" id="dist-name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">TELÉFONO / WHATSAPP</label>
-        <input type="text" id="dist-phone" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">MUNICIPIO / CIUDAD</label>
-        <input type="text" id="dist-municipality" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white">
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">NOTAS / EMAIL</label>
-        <textarea id="dist-notes" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white"></textarea>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE COMPLETO</label>
+        <input type="text" id="dist-name" required placeholder="Ej: Elkin Cardona Alvarez" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
       </div>
 
-      <div class="flex gap-3 pt-2">
-        <button onclick="closeDistributorModal()" class="w-1/2 bg-slate-800 text-slate-300 font-bold py-2.5 rounded-xl text-sm hover:bg-slate-700 transition">Cancelar</button>
-        <button onclick="saveDistributor()" class="w-1/2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-sm transition">Guardar</button>
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">CONTACTO / TELÉFONO</label>
+        <input type="text" id="dist-phone" placeholder="Ej: +57 3127060534" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">MUNICIPIO / DIRECCIÓN</label>
+        <input type="text" id="dist-municipality" placeholder="Ej: Pereira" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">EMAIL / OBSERVACIONES</label>
+        <input type="text" id="dist-notes" placeholder="Ej: contacto@ejemplo.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div class="flex gap-3 justify-end pt-2">
+        <button onclick="closeDistributorModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
+        <button onclick="saveDistributor()" class="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-500 shadow-lg shadow-amber-600/30">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PRODUCTOS STOCK BAJO -->
+  <div id="low-stock-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-2xl shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-xl font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Productos en Stock Bajo
+        </h3>
+        <button onclick="closeLowStockModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+
+      <div class="max-h-96 overflow-y-auto border border-slate-800 rounded-xl">
+        <table class="w-full text-left text-slate-300">
+          <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
+            <tr>
+              <th class="p-3">Código</th>
+              <th class="p-3">Producto</th>
+              <th class="p-3">Stock Actual</th>
+              <th class="p-3">Mínimo</th>
+              <th class="p-3">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="low-stock-modal-body" class="divide-y divide-slate-800 text-sm"></tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeLowStockModal()" class="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Registrar Movimiento -->
+  <div id="movement-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4 relative">
+      <h3 class="text-xl font-bold text-white">Registrar Entrada / Salida</h3>
+      
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">TIPO DE MOVIMIENTO</label>
+        <select id="mov-type" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
+          <option value="IN">➕ Entrada (Suma al Stock)</option>
+          <option value="OUT">➖ Salida (Resta del Stock)</option>
+        </select>
+      </div>
+
+      <div class="relative">
+        <label class="block text-xs font-semibold text-slate-400 mb-1">PRODUCTO</label>
+        <input 
+          type="text" 
+          id="mov-product-search" 
+          oninput="filterModalProducts()" 
+          placeholder="🔍 Escribe para buscar producto..." 
+          autocomplete="off"
+          class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500"
+        >
+        <input type="hidden" id="mov-product-id">
+        <div id="mov-product-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">CANTIDAD</label>
+        <input type="number" id="mov-qty" min="1" value="1" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">COMENTARIO / OBSERVACIÓN (Obligatorio)</label>
+        <textarea id="mov-comment" placeholder="Motivo, número de factura, cliente o proveedor..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white h-24 focus:outline-none"></textarea>
+      </div>
+
+      <div class="flex gap-3 justify-end pt-2">
+        <button onclick="closeMovementModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
+        <button onclick="saveMovement()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 shadow-lg shadow-indigo-600/30">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR PRODUCTO -->
+  <div id="edit-product-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
+      <h3 class="text-xl font-bold text-white">Editar Datos del Producto</h3>
+      <input type="hidden" id="edit-product-id">
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE DEL PRODUCTO</label>
+        <input type="text" id="edit-product-name" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">UNIDADES EN STOCK</label>
+        <input type="number" id="edit-product-stock" min="0" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">PRECIO COMPRA</label>
+          <input type="number" step="0.01" id="edit-purchase-price" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-amber-400 mb-1">PRECIO VENTA</label>
+          <input type="number" step="0.01" id="edit-sale-price" oninput="updateVatPreview('edit-sale-price', 'edit-sale-price-vat')" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-emerald-400 mb-1">PRE. VENT. + IVA (+19%)</label>
+        <input type="text" id="edit-sale-price-vat" readonly disabled class="w-full bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-emerald-400 font-bold cursor-not-allowed">
+      </div>
+
+      <div class="flex gap-3 justify-end pt-2">
+        <button onclick="closeEditProductModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
+        <button onclick="saveProductEdit()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 shadow-lg shadow-indigo-600/30">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CREAR NUEVO PRODUCTO -->
+  <div id="add-product-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
+      <h3 class="text-xl font-bold text-white">Añadir Nuevo Producto</h3>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">CÓDIGO (Ej: PROD-421)</label>
+        <input type="text" id="add-product-code" placeholder="PROD-XXX" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE DEL PRODUCTO</label>
+        <input type="text" id="add-product-name" placeholder="Ej: Tornillo M6 x 20mm" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">STOCK INICIAL</label>
+        <input type="number" id="add-product-stock" min="0" value="0" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">PRECIO COMPRA</label>
+          <input type="number" step="0.01" id="add-purchase-price" value="0" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-amber-400 mb-1">PRECIO VENTA</label>
+          <input type="number" step="0.01" id="add-sale-price" value="0" oninput="updateVatPreview('add-sale-price', 'add-sale-price-vat')" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-emerald-400 mb-1">PRE. VENT. + IVA (+19%)</label>
+        <input type="text" id="add-sale-price-vat" value="0.00" readonly disabled class="w-full bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-emerald-400 font-bold cursor-not-allowed">
+      </div>
+
+      <div class="flex gap-3 justify-end pt-2">
+        <button onclick="closeAddProductModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
+        <button onclick="saveNewProduct()" class="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 shadow-lg shadow-emerald-600/30">Crear Producto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CAMBIAR CONTRASEÑA -->
+  <div id="change-password-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
+      <h3 class="text-xl font-bold text-white">Cambiar mi Contraseña</h3>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">CONTRASEÑA ACTUAL</label>
+        <input type="password" id="pass-current" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">NUEVA CONTRASEÑA</label>
+        <input type="password" id="pass-new" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">CONFIRMAR NUEVA CONTRASEÑA</label>
+        <input type="password" id="pass-confirm" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
+      </div>
+
+      <div class="flex gap-3 justify-end pt-2">
+        <button onclick="closeChangePasswordModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
+        <button onclick="saveNewPassword()" class="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-500 shadow-lg shadow-amber-600/30">Actualizar Contraseña</button>
       </div>
     </div>
   </div>
