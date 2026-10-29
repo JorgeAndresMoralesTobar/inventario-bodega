@@ -46,19 +46,40 @@
   </div>
 
   <!-- APLICACIÓN PRINCIPAL -->
-  <div id="app-screen" class="hidden flex min-h-screen">
+  <div id="app-screen" class="hidden flex flex-col md:flex-row min-h-screen">
     
-    <!-- Panel Lateral / Sidebar -->
-    <aside class="w-64 bg-slate-950 border-r border-slate-800 p-6 flex flex-col justify-between hidden md:flex">
+    <!-- BARRA SUPERIOR PARA MÓVILES -->
+    <div class="md:hidden bg-slate-950 p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 z-30">
+      <div class="flex items-center gap-3">
+        <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-500/30">
+          <i class="fa-solid fa-boxes-stacked text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-sm text-white">INVENTARIO</h1>
+          <span class="text-[10px] text-indigo-400 font-medium block">Control de Bodega</span>
+        </div>
+      </div>
+      <button onclick="toggleMobileMenu()" class="text-slate-300 hover:text-white p-2 text-xl focus:outline-none">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+
+    <!-- PANEL LATERAL / SIDEBAR -->
+    <aside id="sidebar-menu" class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-950 border-r border-slate-800 p-6 flex flex-col justify-between transform -translate-x-full md:translate-x-0 md:static transition-transform duration-300 ease-in-out">
       <div>
-        <div class="flex items-center gap-3 mb-8">
-          <div class="bg-indigo-600 text-white p-3 rounded-xl shadow-lg shadow-indigo-500/30">
-            <i class="fa-solid fa-boxes-stacked text-xl"></i>
+        <div class="flex items-center justify-between mb-8">
+          <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 text-white p-3 rounded-xl shadow-lg shadow-indigo-500/30">
+              <i class="fa-solid fa-boxes-stacked text-xl"></i>
+            </div>
+            <div>
+              <h1 class="font-bold text-lg text-white">INVENTARIO</h1>
+              <span class="text-xs text-indigo-400 font-medium">Control de Bodega</span>
+            </div>
           </div>
-          <div>
-            <h1 class="font-bold text-lg text-white">INVENTARIO</h1>
-            <span class="text-xs text-indigo-400 font-medium">Control de Bodega</span>
-          </div>
+          <button onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-white">
+            <i class="fa-solid fa-xmark text-xl"></i>
+          </button>
         </div>
 
         <nav class="space-y-2">
@@ -77,7 +98,6 @@
             <i class="fa-solid fa-arrow-right-arrow-left w-5"></i> Historial
           </button>
 
-          <!-- PESTAÑA CONTACTOS (Visibilidad para Admin y Operador) -->
           <button onclick="switchTab('distributors')" id="nav-distributors" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium hidden">
             <i class="fa-solid fa-address-book w-5"></i> Contactos
           </button>
@@ -93,7 +113,7 @@
       </div>
 
       <!-- Perfil de usuario y Opciones -->
-      <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+      <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between mt-6 md:mt-0">
         <div>
           <p id="user-display-name" class="text-sm font-bold text-white"></p>
           <p id="user-display-role" class="text-xs text-indigo-400 font-semibold uppercase"></p>
@@ -110,15 +130,15 @@
     </aside>
 
     <!-- Contenido Principal -->
-    <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto w-full">
       <!-- Header -->
-      <header class="flex justify-between items-center mb-8 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+      <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 bg-slate-950 p-4 rounded-2xl border border-slate-800">
         <div>
           <h2 id="page-title" class="text-2xl font-bold text-white">Panel Principal</h2>
           <p class="text-sm text-slate-400">Estado general y movimientos en tiempo real</p>
         </div>
-        <div class="flex items-center gap-4">
-          <button onclick="openMovementModal()" id="btn-new-movement" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition">
+        <div class="flex items-center gap-4 w-full sm:w-auto">
+          <button onclick="openMovementModal()" id="btn-new-movement" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition">
             <i class="fa-solid fa-plus"></i> Registrar Entrada / Salida
           </button>
         </div>
@@ -126,7 +146,7 @@
 
       <!-- Tab 1: Dashboard -->
       <div id="tab-dashboard" class="tab-content space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
           <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
             <p class="text-slate-400 text-sm font-medium">Total Productos</p>
             <h3 id="stat-total-products" class="text-3xl font-extrabold text-white mt-1">0</h3>
@@ -206,7 +226,7 @@
 
         <!-- GRÁFICO DE EVOLUCIÓN -->
         <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-          <div class="flex justify-between items-center mb-4">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
             <div>
               <h3 id="chart-title" class="text-lg font-bold text-white">Evolución del Valor del Inventario</h3>
               <p class="text-xs text-slate-400">Proyección y seguimiento por semanas</p>
@@ -231,8 +251,8 @@
           </button>
         </div>
 
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
-          <table class="w-full text-left text-slate-300">
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
+          <table class="w-full text-left text-slate-300 min-w-[650px]">
             <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
               <tr>
                 <th class="p-4">Código</th>
@@ -251,7 +271,7 @@
 
       <!-- Tab 3: Historial -->
       <div id="tab-movements" class="tab-content hidden space-y-6">
-        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
           <div>
             <label class="block text-xs font-semibold text-slate-400 mb-1">BUSCAR (PRODUCTO / USUARIO)</label>
             <input type="text" id="mov-filter-search" oninput="applyMovementFilters()" placeholder="🔍 Producto u operador..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
@@ -274,8 +294,8 @@
           </div>
         </div>
 
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
-          <table class="w-full text-left text-slate-300">
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
+          <table class="w-full text-left text-slate-300 min-w-[650px]">
             <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
               <tr>
                 <th class="p-4">Fecha y Hora</th>
@@ -294,7 +314,7 @@
 
       <!-- TAB CONTACTOS -->
       <div id="tab-distributors" class="tab-content hidden space-y-6">
-        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
           <div>
             <label class="block text-xs font-semibold text-slate-400 mb-1">BUSCAR POR NOMBRE O TELÉFONO</label>
             <input type="text" id="dist-filter-search" oninput="applyDistributorFilters()" placeholder="🔍 Nombre, teléfono..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
@@ -313,15 +333,14 @@
             <input type="text" id="dist-filter-municipality" oninput="applyDistributorFilters()" placeholder="🔍 Municipio..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
           </div>
           <div class="flex items-end">
-            <!-- Botón solo visible para Administrador -->
             <button onclick="openAddDistributorModal()" id="btn-add-distributor" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold p-3 rounded-xl transition shadow-lg shadow-amber-600/30 flex items-center justify-center gap-2 hidden">
               <i class="fa-solid fa-user-plus"></i> Nuevo Contacto
             </button>
           </div>
         </div>
 
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
-          <table class="w-full text-left text-slate-300">
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
+          <table class="w-full text-left text-slate-300 min-w-[650px]">
             <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
               <tr>
                 <th class="p-4">Acción / Tipo</th>
@@ -349,7 +368,7 @@
           </form>
         </div>
 
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
           <div class="p-4 bg-slate-900/50 border-b border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
             <h4 class="font-bold text-white text-sm" id="requests-list-title">Lista de Peticiones</h4>
             <input 
@@ -360,7 +379,7 @@
               class="w-full md:w-72 bg-slate-900 border border-slate-800 text-white text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500"
             >
           </div>
-          <table class="w-full text-left text-slate-300">
+          <table class="w-full text-left text-slate-300 min-w-[600px]">
             <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
               <tr>
                 <th class="p-4">Fecha</th>
@@ -403,8 +422,8 @@
           </div>
         </form>
 
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
-          <table class="w-full text-left text-slate-300">
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
+          <table class="w-full text-left text-slate-300 min-w-[500px]">
             <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
               <tr>
                 <th class="p-4">Usuario</th>
@@ -496,7 +515,7 @@
     </div>
   </div>
 
-  <!-- Modal Registrar Movimiento -->
+  <!-- MODAL REGISTRAR MOVIMIENTO -->
   <div id="movement-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
     <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4 relative">
       <h3 class="text-xl font-bold text-white">Registrar Entrada / Salida</h3>

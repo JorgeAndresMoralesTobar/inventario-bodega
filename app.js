@@ -36,6 +36,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+// ABRIR / CERRAR MENÚ MÓVIL
+function toggleMobileMenu() {
+  const sidebar = document.getElementById('sidebar-menu');
+  if (sidebar) {
+    sidebar.classList.toggle('-translate-x-full');
+  }
+}
+
 // CÁLCULO DE IVA EN TIEMPO REAL
 function updateVatPreview(priceInputId, vatDisplayId) {
   const priceVal = parseFloat(document.getElementById(priceInputId).value) || 0;
@@ -385,7 +393,7 @@ function renderDistributors(customList = null) {
     const cleanPhone = d.phone ? d.phone.replace(/[^0-9]/g, '') : '';
 
     tbody.innerHTML += `
-      <tr class="hover:bg-slate-900 transition">
+      <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
         <td class="p-4">
           <span class="px-2.5 py-1 rounded-full text-xs font-bold border ${catClass}">
             ${d.category || 'PROVEEDORES'}
@@ -592,7 +600,7 @@ function filterLowStockProducts(showAll = false) {
   const input = document.getElementById("select-low-stock-filter-search");
   const resultsDiv = document.getElementById("select-low-stock-filter-results");
   const query = showAll ? "" : input.value.toLowerCase().trim();
-  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0));
+  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 5));
 
   let html = `
     <div onclick="selectLowStockProduct('all', '⚠️ Mostrar todos los críticos (${lowStockItems.length})')" class="p-2.5 text-xs text-slate-200 hover:bg-rose-600 hover:text-white cursor-pointer transition">
@@ -629,7 +637,7 @@ function previewLowStockItem() {
   const statLowStock = document.getElementById('stat-low-stock');
 
   if (selectedId === 'all') {
-    const totalLow = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0)).length;
+    const totalLow = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 5)).length;
     statLowStock.innerText = totalLow;
   } else {
     const p = products.find(prod => prod.id === parseInt(selectedId));
@@ -701,7 +709,7 @@ function renderMovements(customList = null) {
   list.forEach(m => {
     const formattedDate = new Date(m.created_at).toLocaleString();
     tbody.innerHTML += `
-      <tr class="hover:bg-slate-900 transition">
+      <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
         <td class="p-4 text-xs text-slate-400">${formattedDate}</td>
         <td class="p-4">
           <span class="px-2.5 py-1 rounded-full text-xs font-bold ${m.type === 'IN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
@@ -831,7 +839,7 @@ function renderRequests(customList = null) {
     const dateStr = new Date(req.created_at).toLocaleDateString();
 
     tbody.innerHTML += `
-      <tr class="hover:bg-slate-900 transition">
+      <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
         <td class="p-4 text-xs text-slate-400">${dateStr}</td>
         <td class="p-4 font-bold text-white">@${req.username}</td>
         <td class="p-4 text-slate-200">${req.request_text}</td>
@@ -861,7 +869,7 @@ function openLowStockModal() {
   const tbody = document.getElementById('low-stock-modal-body');
   if (!modal || !tbody) return;
 
-  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0));
+  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 5));
 
   tbody.innerHTML = '';
 
@@ -872,7 +880,7 @@ function openLowStockModal() {
 
     lowStockItems.forEach(p => {
       tbody.innerHTML += `
-        <tr class="hover:bg-slate-900 transition">
+        <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
           <td class="p-3 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
           <td class="p-3 font-medium text-white">${p.name}</td>
           <td class="p-3 text-rose-400 font-bold">${p.stock} un.</td>
@@ -922,11 +930,17 @@ function switchTab(tabName) {
   document.querySelectorAll('nav button').forEach(el => el.classList.remove('active-nav'));
   const targetNav = document.getElementById(`nav-${tabName}`);
   if (targetNav) targetNav.classList.add('active-nav');
+
+  // Cerrar el menú si estamos en un teléfono
+  const sidebar = document.getElementById('sidebar-menu');
+  if (sidebar && window.innerWidth < 768) {
+    sidebar.classList.add('-translate-x-full');
+  }
 }
 
 function renderDashboard() {
   const totalProducts = products.length;
-  const lowStock = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 0)).length;
+  const lowStock = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 5)).length;
 
   document.getElementById('stat-total-products').innerText = totalProducts;
   document.getElementById('stat-low-stock').innerText = lowStock;
@@ -1022,7 +1036,7 @@ function renderChart() {
   });
 }
 
-// RENDER TABLA PRODUCTOS
+// RENDER TABLA PRODUCTOS (Resistente a errores)
 function renderProducts(filteredList = null) {
   const list = filteredList || products;
   const tbody = document.getElementById('inventory-table-body');
@@ -1041,7 +1055,7 @@ function renderProducts(filteredList = null) {
     const isAdmin = currentUser && currentUser.role === 'admin';
 
     const salePrice = Number(p.sale_price) || 0;
-    // Cálculo seguro del Precio Venta + IVA (19%)
+    // Cálculo de la columna PRE. VENT. + IVA (19%)
     const salePriceVat = salePrice * 1.19;
 
     tbody.innerHTML += `
@@ -1105,7 +1119,7 @@ async function saveNewProduct() {
   const purchasePrice = parseFloat(document.getElementById('add-purchase-price').value) || 0;
   const salePrice = parseFloat(document.getElementById('add-sale-price').value) || 0;
   
-  // Cálculo automático del Precio con IVA (Venta * 1.19)
+  // Fórmula automática: Precio Venta * 1.19
   const salePriceVat = Number((salePrice * 1.19).toFixed(2));
 
   if (!name) {
@@ -1158,7 +1172,7 @@ function openEditProductModal(productId) {
   if (!product) return;
 
   const salePrice = Number(product.sale_price || 0);
-  const salePriceVat = Number(product.sale_price_vat || (salePrice * 1.19));
+  const salePriceVat = salePrice * 1.19;
 
   document.getElementById('edit-product-id').value = product.id;
   document.getElementById('edit-product-name').value = product.name;
@@ -1183,7 +1197,7 @@ async function saveProductEdit() {
   const newPurchasePrice = parseFloat(document.getElementById('edit-purchase-price').value) || 0;
   const newSalePrice = parseFloat(document.getElementById('edit-sale-price').value) || 0;
   
-  // Cálculo automático del Precio con IVA (Venta * 1.19)
+  // Fórmula automática: Precio Venta * 1.19
   const newSalePriceVat = Number((newSalePrice * 1.19).toFixed(2));
 
   if (!newName) {
