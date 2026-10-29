@@ -225,7 +225,11 @@ async function fetchProducts() {
   if (!supabaseClient) return;
   const { data, error } = await supabaseClient.from("products").select("*").order("id", { ascending: true });
   if (!error && data) {
-    products = data;
+    // Garantiza que use el campo 'name' o 'productos' tal como viene de la base de datos
+    products = data.map(item => ({
+      ...item,
+      name: item.name || item.productos || item.PRODUCTOS || ''
+    }));
     renderDashboard();
     renderProducts();
   }
@@ -1037,6 +1041,7 @@ function renderChart() {
 }
 
 // RENDER TABLA PRODUCTOS (Resistente a errores)
+// RENDER TABLA PRODUCTOS
 function renderProducts(filteredList = null) {
   const list = filteredList || products;
   const tbody = document.getElementById('inventory-table-body');
@@ -1055,12 +1060,12 @@ function renderProducts(filteredList = null) {
     const isAdmin = currentUser && currentUser.role === 'admin';
 
     const salePrice = Number(p.sale_price) || 0;
-    // Cálculo de la columna PRE. VENT. + IVA (19%)
     const salePriceVat = salePrice * 1.19;
 
     tbody.innerHTML += `
       <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
         <td class="p-4 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
+        <!-- Nombre tomado directamente del campo name / PRODUCTOS de la BD -->
         <td class="p-4 font-medium text-white">${p.name || ''}</td>
         <td class="p-4">
           <span class="px-2.5 py-1 rounded-full text-xs font-bold ${stock <= minStock ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
