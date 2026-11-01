@@ -1,686 +1,697 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="scroll-smooth">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alumax JT · Control de bodega</title>
-  
-  <!-- Estilos base y Tailwind CSS -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alumax JT | Empaques, O-rings, PVC y ferretería al por mayor</title>
+  <meta name="description" content="Distribuciones Alumax JT. Venta y distribución mayorista de empaques, sellos O-Rings, plomería PVC, herrajes de seguridad y ferretería industrial." />
+
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // Paleta grafito + cobalto: cambia todos los colores de la app sin tocar cada pantalla.
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: { sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'], display: ['"Bricolage Grotesque"', 'sans-serif'] },
-          borderRadius: { xl: '14px', '2xl': '22px' },
-          colors: {
-            slate: { 50:'#f4f5f7', 100:'#edeef0', 200:'#dde0e4', 300:'#c3c7cd', 400:'#9aa0a8', 500:'#6a7078', 600:'#4a4e55', 700:'#34373c', 800:'#26282c', 900:'#0c0d0f', 950:'#17181b' },
-            indigo: { 300:'#a9c1ff', 400:'#7aa2ff', 500:'#3d74f5', 600:'#1b5cf2', 700:'#1449c4', 900:'#0f2a6b', 950:'#0a1a42' }
+          fontFamily: {
+            sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
+            display: ['"Bricolage Grotesque"', 'sans-serif'],
           }
         }
       }
     }
   </script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css">
 
-  <!-- SDK oficial de Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Chart.js para gráficos interactivos -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons & Confetti CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <!-- Custom Stylesheets -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="apple.css" />
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen">
+<body class="antialiased selection:bg-blue-600 selection:text-white">
 
-  <!-- PANTALLA DE LOGIN -->
-  <div id="login-screen" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
-    <div class="ax-login-rings" aria-hidden="true"><div class="ax-ring"></div><div class="ax-ring ax-ring--b"></div><div class="ax-ring ax-ring--c"></div></div>
-    <div class="ax-login-card w-full max-w-md space-y-6">
-      <div class="text-center space-y-2">
-        <div class="ax-mark ax-mark--lg" aria-hidden="true"></div>
-        <h2 class="text-2xl font-bold text-white">Acceso al Inventario</h2>
-        <p class="text-xs text-slate-400">Ingresa tus credenciales para continuar</p>
+  <div class="ax" id="top">
+
+  <!-- Navegación -->
+  <header class="ax-nav">
+    <div class="ax-nav__in">
+      <a href="#top" class="ax-brand" aria-label="Alumax JT, inicio">
+        <span class="ax-brand__mark" aria-hidden="true"></span>Alumax JT
+      </a>
+
+      <nav class="ax-links" aria-label="Principal">
+        <a href="#catalogo" onclick="app.setCategory('todas')">Catálogo</a>
+        <a href="#catalogo" onclick="app.setCategory('sellos-orings')">Sellos y O-rings</a>
+        <a href="#catalogo" onclick="app.setCategory('plomeria-pvc')">Plomería y PVC</a>
+        <a href="#catalogo" onclick="app.setCategory('herrajes-seguridad')">Herrajes</a>
+        <a href="#catalogo" onclick="app.setCategory('ferreteria-industrial')">Ferretería</a>
+        <a href="#flash-deals" class="ax-links__flash">Ofertas flash</a>
+      </nav>
+
+      <div class="ax-tools">
+        <!-- BUSCADOR CON VISTA PREVIA DESPLEGABLE (LIVE SEARCH) -->
+        <div class="relative hidden md:block">
+          <label class="ax-search">
+            <i data-lucide="search"></i>
+            <input id="search-input" type="text" placeholder="Buscar ref, producto..." aria-label="Buscar productos" autocomplete="off" oninput="app.handleLiveSearch(this.value)" />
+          </label>
+          <!-- Desplegable dinámico de búsqueda -->
+          <div id="search-dropdown" class="hidden absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 max-h-96 overflow-y-auto p-2 text-slate-800">
+            <div id="search-dropdown-results" class="space-y-1"></div>
+          </div>
+        </div>
+
+        <button class="ax-icon-btn ax-mobile-trigger" aria-label="Buscar" onclick="document.getElementById('mobile-search-bar').classList.toggle('hidden')">
+          <i data-lucide="search"></i>
+        </button>
+
+        <button class="ax-region" onclick="app.openRegionModal()" title="Cambiar país y moneda">
+          <span class="global-region-label">🇨🇴 CO • COP ($)</span>
+        </button>
+
+        <button class="ax-icon-btn" onclick="app.openWishlistModal()" aria-label="Lista de deseos">
+          <i data-lucide="heart"></i>
+          <span class="wishlist-count-badge ax-badge hidden">0</span>
+        </button>
+
+        <button class="ax-icon-btn" onclick="app.openCart()" aria-label="Abrir la cesta">
+          <i data-lucide="shopping-bag"></i>
+          <span class="cart-count-badge ax-badge hidden">0</span>
+        </button>
+
+        <button class="ax-icon-btn" onclick="app.isAdmin() ? app.logoutAdmin() : app.loginAdmin()" aria-label="Acceso de administrador" title="Acceso de administrador">
+          <i data-lucide="key-round"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Buscador Móvil con Desplegable -->
+    <div id="mobile-search-bar" class="ax-mobile-search hidden relative">
+      <input type="text" oninput="app.handleLiveSearch(this.value, 'mobile')" placeholder="Buscar por referencia, nombre o proveedor..." aria-label="Buscar productos" />
+      <div id="mobile-search-dropdown" class="hidden absolute top-full left-6 right-6 mt-1 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 max-h-80 overflow-y-auto p-2 text-slate-800">
+        <div id="mobile-search-dropdown-results" class="space-y-1"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Portada -->
+  <section class="ax-hero">
+    <div class="ax-hero__copy">
+      <h1>Lo que sella, conecta y asegura.</h1>
+      <p>Empaques, O-rings, tubería PVC, herrajes y ferretería industrial. Venta al por mayor.</p>
+      <div class="ax-hero__cta">
+        <a href="#catalogo" class="ax-btn ax-btn--blue">Ver el catálogo</a>
+        <a href="#flash-deals" class="ax-btn ax-btn--ghost">Ofertas flash</a>
+        <button onclick="app.openAddProductModal()" class="admin-only hidden ax-btn ax-btn--ghost">Añadir producto</button>
+      </div>
+    </div>
+    <div class="ax-rings" aria-hidden="true">
+      <div class="ax-ring"></div>
+      <div class="ax-ring ax-ring--b"></div>
+      <div class="ax-ring ax-ring--c"></div>
+    </div>
+  </section>
+
+  <!-- Líneas de producto -->
+  <section class="ax-section ax-section--alu" id="lineas">
+    <div class="ax-wrap">
+      <div class="ax-section__head">
+        <h2 class="ax-h2">Cinco líneas.<br />Un solo proveedor.</h2>
+        <p class="ax-lede">Elige una línea y mira todo lo que tenemos.</p>
+      </div>
+      <div class="ax-tiles">
+        <a href="#catalogo" onclick="app.setCategory('sellos-orings')" class="ax-tile ax-tile--dark ax-tile--a ax-tile--big">
+          <span class="ax-tile__ring" aria-hidden="true"></span>
+          <div><h3>Sellos y O-rings</h3><p>Anillos y empaques en todas las medidas.</p></div>
+          <span class="ax-tile__go">Ver productos</span>
+        </a>
+        <a href="#catalogo" onclick="app.setCategory('plomeria-pvc')" class="ax-tile ax-tile--b">
+          <div><h3>Plomería y PVC</h3><p>Tubería, uniones y accesorios.</p></div>
+          <span class="ax-tile__go">Ver productos</span>
+        </a>
+        <a href="#catalogo" onclick="app.setCategory('herrajes-seguridad')" class="ax-tile ax-tile--blue ax-tile--c">
+          <div><h3>Herrajes y manijas</h3><p>Seguridad para puertas y ventanas.</p></div>
+          <span class="ax-tile__go">Ver productos</span>
+        </a>
+        <a href="#catalogo" onclick="app.setCategory('ferreteria-industrial')" class="ax-tile ax-tile--d">
+          <div><h3>Ferretería y construcción</h3><p>Niveladores, tornillería y piezas de obra.</p></div>
+          <span class="ax-tile__go">Ver productos</span>
+        </a>
+        <a href="#catalogo" onclick="app.setCategory('herramientas-agro')" class="ax-tile ax-tile--dark ax-tile--e">
+          <div><h3>Herramientas y taller</h3><p>Para el taller y para el campo.</p></div>
+          <span class="ax-tile__go">Ver productos</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ofertas flash -->
+  <section id="flash-deals" class="ax-flash">
+    <h2>Ofertas flash.</h2>
+    <p>Descuentos de hasta 30% mientras el reloj siga corriendo.</p>
+    <div class="ax-clock" role="timer" aria-label="Tiempo restante de las ofertas">
+      <div class="ax-clock__unit"><span id="cd-hours" class="ax-clock__num">14</span><span class="ax-clock__label">horas</span></div>
+      <span class="ax-clock__sep" aria-hidden="true">:</span>
+      <div class="ax-clock__unit"><span id="cd-mins" class="ax-clock__num">42</span><span class="ax-clock__label">minutos</span></div>
+      <span class="ax-clock__sep" aria-hidden="true">:</span>
+      <div class="ax-clock__unit"><span id="cd-secs" class="ax-clock__num">15</span><span class="ax-clock__label">segundos</span></div>
+    </div>
+    <div><a href="#catalogo" onclick="app.setCategory('todas')" class="ax-btn ax-btn--blue">Ver el catálogo</a></div>
+  </section>
+
+  <!-- Producto destacado -->
+  <section class="ax-section" style="padding-bottom:0">
+    <div class="ax-wrap">
+      <div class="ax-spot">
+        <div class="ax-spot__img">
+          <img src="https://images.unsplash.com/photo-1558441719-8b489c63f7d1?auto=format&fit=crop&w=900&q=80" alt="Rin Trailer reforzado" />
+        </div>
+        <div class="ax-spot__copy">
+          <small>Destacado de la semana</small>
+          <h2 class="ax-h2">Rin Trailer reforzado.</h2>
+          <div class="ax-price">
+            <strong id="hero-product-price">$ 87.707</strong>
+            <s id="hero-product-oldprice">$ 105.248</s>
+            <em>-17%</em>
+          </div>
+          <div class="ax-spot__actions">
+            <button onclick="app.quickAddToCart('art-001')" class="ax-btn ax-btn--blue">Añadir a la cesta</button>
+            <button onclick="app.openQuickView('art-001')" class="ax-btn ax-btn--dark">Ver detalles</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Catálogo y Filtros Desplegables -->
+  <main id="catalogo" class="ax-section">
+    <div class="ax-wrap">
+      <div class="ax-catalog__bar">
+        <div>
+          <h2 class="ax-h2">Catálogo General.</h2>
+          <p id="products-count" class="ax-catalog__count">Cargando catálogo...</p>
+        </div>
+
+        <!-- LISTAS DESPLEGABLES (SELECTS) DE FILTRADO TÉCNICO -->
+        <div class="ax-tools-row">
+          <!-- Filtro Categorías -->
+          <label class="ax-select">Categoría:
+            <select id="filter-category-select" onchange="app.setCategory(this.value)">
+              <option value="todas">Todas las categorías</option>
+              <option value="plomeria-pvc">Plomería & PVC</option>
+              <option value="sellos-orings">Sellos & O-Rings</option>
+              <option value="herrajes-seguridad">Herrajes & Seguridad</option>
+              <option value="ferreteria-industrial">Ferretería Industrial</option>
+              <option value="herramientas-agro">Herramientas & Taller</option>
+            </select>
+          </label>
+
+          <!-- Filtro Proveedores/Distribuidores -->
+          <label class="ax-select">Proveedor:
+            <select id="filter-provider-select" onchange="app.setProviderFilter(this.value)">
+              <option value="todos">Todos los distribuidores</option>
+            </select>
+          </label>
+
+          <!-- Filtro Ordenar -->
+          <label class="ax-select">Ordenar:
+            <select id="sort-select">
+              <option value="featured">Recomendados</option>
+              <option value="deals">Mayor descuento</option>
+              <option value="bestseller">Más vendidos</option>
+              <option value="rating">Mejor valorados</option>
+              <option value="price-asc">Precio: de menor a mayor</option>
+              <option value="price-desc">Precio: de mayor a menor</option>
+            </select>
+          </label>
+
+          <button onclick="app.resetFilters()" class="ax-chip" title="Quitar filtros y búsqueda">Limpiar filtros</button>
+          <button onclick="app.openAddProductModal()" class="admin-only hidden ax-chip">Añadir producto</button>
+          <button onclick="app.openAdminModal()" class="admin-only hidden ax-chip">Gestionar catálogo</button>
+        </div>
       </div>
 
-      <form onsubmit="handleLogin(event)" class="space-y-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 mb-1">USUARIO</label>
-          <input type="text" id="login-username" required placeholder="Ej: admin" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 mb-1">CONTRASEÑA</label>
-          <input type="password" id="login-password" required placeholder="••••••••" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
+      <div class="ax-pills"><div id="category-pills-container" style="display:flex;gap:8px"></div></div>
+
+      <div id="products-grid" class="ax-grid"></div>
+    </div>
+  </main>
+
+  <!-- Pie de Página con Botón de Reseñas en Google -->
+  <footer class="ax-foot">
+    <div class="ax-wrap">
+      <div class="ax-foot__grid">
+        <div class="ax-foot__brand">
+          <h4>Distribuciones Alumax JT S.A.S.</h4>
+          <p class="mb-4">Comercialización y distribución mayorista de empaques, sellos, tubería PVC, herrajes de seguridad y ferretería industrial.</p>
+          
+          <!-- BOTÓN DIRECTO RESEÑAS EN GOOGLE -->
+          <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2 bg-white text-slate-800 rounded-2xl border border-slate-300 font-bold text-xs hover:bg-slate-100 transition-all shadow-sm">
+            <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+            <span>Déjanos tu opinión en Google</span>
+          </a>
         </div>
 
-        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold p-3 rounded-xl shadow-lg shadow-indigo-600/30 transition">
-          Iniciar Sesión
-        </button>
-      </form>
+        <div>
+          <h4>Colecciones</h4>
+          <ul>
+            <li><a href="#catalogo" onclick="app.setCategory('sellos-orings')">Sellos y O-rings</a></li>
+            <li><a href="#catalogo" onclick="app.setCategory('plomeria-pvc')">Plomería y PVC</a></li>
+            <li><a href="#catalogo" onclick="app.setCategory('herrajes-seguridad')">Herrajes y manijas</a></li>
+            <li><a href="#catalogo" onclick="app.setCategory('ferreteria-industrial')">Ferretería y construcción</a></li>
+            <li><a href="#catalogo" onclick="app.setCategory('herramientas-agro')">Herramientas y taller</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Atención al cliente</h4>
+          <ul>
+            <li><a href="javascript:void(0)" onclick="app.showToast('Estado del pedido', 'Ingresa tu número de pedido en el panel de usuario.', 'info')">Estado de mi pedido</a></li>
+            <li><a href="javascript:void(0)" onclick="app.showToast('Devoluciones', 'Devoluciones gratuitas durante 30 días con recogida en tu puerta.', 'info')">Devoluciones</a></li>
+            <li><a href="javascript:void(0)" onclick="app.showToast('Garantía', 'Todos los productos cuentan con respaldo directo de fábrica.', 'info')">Garantía</a></li>
+            <li><a href="javascript:void(0)" onclick="app.showToast('Atención y ventas', 'Escríbenos a ventas@distribucionesalumaxjt.com.', 'info')">Ventas</a></li>
+            <li><a href="javascript:void(0)" onclick="app.showToast('Guía de medidas', 'Consulta las tablas de medidas y calibres de cada fabricante.', 'info')">Guía de medidas</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Alumax JT</h4>
+          <ul>
+            <li><a href="#">Sobre nosotros</a></li>
+            <li><a href="#">Ventas al por mayor</a></li>
+            <li><a href="#">Certificado de calidad</a></li>
+            <li><a href="#">Privacidad</a></li>
+            <li><a href="#">Términos y condiciones</a></li>
+          </ul>
+        </div>
+      </div>
+      <p class="ax-foot__legal">© 2026 Distribuciones Alumax JT S.A.S. Todos los derechos reservados. Colombia.</p>
+    </div>
+  </footer>
+
+  </div><!-- /.ax -->
+
+  <!-- MODAL CARRITO / CESTA -->
+  <div id="cart-drawer" class="fixed inset-0 z-50 hidden">
+    <div id="cart-backdrop" onclick="app.closeCart()" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm opacity-0 transition-opacity duration-300"></div>
+    <div class="fixed inset-y-0 right-0 max-w-full flex pl-10">
+      <div id="cart-panel" class="w-screen max-w-md bg-white shadow-2xl flex flex-col translate-x-full transition-transform duration-300">
+        <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="shopping-bag" class="w-5 h-5 text-slate-900"></i>
+            <h3 class="font-extrabold font-display text-lg text-slate-900">Tu Cesta de Compra</h3>
+            <span class="cart-count-badge bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <button onclick="app.closeCart()" class="p-2 text-slate-400 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-4 bg-slate-50 border-b border-slate-100">
+          <p id="free-shipping-text" class="text-xs text-slate-700 font-medium mb-2">Calculando gastos de envío...</p>
+          <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+            <div id="free-shipping-progress" class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-4">
+          <div id="cart-empty-state" class="py-16 text-center">
+            <div class="w-16 h-16 mx-auto mb-4 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center">
+              <i data-lucide="shopping-cart" class="w-8 h-8"></i>
+            </div>
+            <h4 class="font-bold text-slate-900 text-base mb-1">Tu cesta está vacía</h4>
+            <p class="text-xs text-slate-500 max-w-xs mx-auto mb-6">Explora nuestros productos y añade tus artículos al carrito.</p>
+            <button onclick="app.closeCart()" class="px-6 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-full hover:bg-slate-800 transition-all">Continuar comprando</button>
+          </div>
+          <div id="cart-items-container"></div>
+        </div>
+
+        <div id="cart-footer-controls" class="p-6 border-t border-slate-100 bg-slate-50/50 space-y-4">
+          <div class="flex gap-2">
+            <input id="coupon-input" type="text" placeholder="Código promocional (ej: MAYORISTA)" class="flex-1 px-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 uppercase font-semibold" />
+            <button onclick="app.applyPromoCode()" class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all">Aplicar</button>
+          </div>
+          <div class="space-y-1.5 text-xs text-slate-600">
+            <div class="flex justify-between"><span>Subtotal:</span><span id="cart-subtotal" class="font-bold text-slate-900">$ 0</span></div>
+            <div id="cart-discount-row" class="flex justify-between text-emerald-600 hidden font-semibold"><span>Descuento aplicado:</span><span id="cart-discount-val">-$ 0</span></div>
+            <div class="flex justify-between"><span>Envío Express Colombia:</span><span id="cart-shipping" class="font-bold text-slate-900">$ 12.000</span></div>
+            <div class="pt-2 border-t border-slate-200 flex justify-between text-base font-extrabold text-slate-950 font-display"><span>Total:</span><span id="cart-total">$ 0</span></div>
+          </div>
+          <button onclick="app.openCheckoutModal()" class="w-full py-4 bg-slate-950 hover:bg-blue-600 text-white font-bold text-sm rounded-2xl shadow-xl hover:shadow-blue-500/25 transition-all flex items-center justify-center gap-2">
+            <i data-lucide="lock" class="w-4 h-4"></i>
+            <span>Tramitar Pedido Seguro</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- APLICACIÓN PRINCIPAL -->
-  <div id="app-screen" class="hidden flex flex-col md:flex-row min-h-screen">
-    
-    <!-- BARRA SUPERIOR PARA MÓVILES -->
-    <div class="md:hidden bg-slate-950 p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 z-30">
-      <div class="flex items-center gap-3">
-        <div class="ax-mark ax-mark--sm" aria-hidden="true"></div>
-        <div>
-          <h1 class="font-bold text-sm text-white">Alumax JT</h1>
-          <span class="text-[10px] text-slate-400 font-medium block">Control de bodega</span>
-        </div>
+  <!-- VISTA RÁPIDA / DETALLE PRODUCTO -->
+  <div id="quickview-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div onclick="app.closeQuickView()" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md"></div>
+    <div class="flex min-h-full items-center justify-center p-4 sm:p-6">
+      <div class="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 overflow-hidden z-10">
+        <button onclick="app.closeQuickView()" class="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+        <div id="quickview-body"></div>
       </div>
-      <button onclick="toggleMobileMenu()" class="text-slate-300 hover:text-white p-2 text-xl focus:outline-none">
-        <i class="fa-solid fa-bars"></i>
-      </button>
     </div>
+  </div>
 
-    <!-- PANEL LATERAL / SIDEBAR -->
-    <aside id="sidebar-menu" class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-950 border-r border-slate-800 p-6 flex flex-col justify-between transform -translate-x-full md:translate-x-0 md:static transition-transform duration-300 ease-in-out">
-      <div>
-        <div class="flex items-center justify-between mb-8">
-          <div class="flex items-center gap-3">
-            <div class="ax-mark" aria-hidden="true"></div>
-            <div>
-              <h1 class="font-bold text-lg text-white">Alumax JT</h1>
-              <span class="text-xs text-slate-400 font-medium">Control de bodega</span>
-            </div>
+  <!-- FAVORITOS / WISHLIST -->
+  <div id="wishlist-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div onclick="app.closeWishlistModal()" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 sm:p-8 z-10">
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-2">
+            <i data-lucide="heart" class="w-5 h-5 text-rose-500 fill-rose-500"></i>
+            <h3 class="font-extrabold font-display text-lg text-slate-900">Lista de Deseos</h3>
           </div>
-          <button onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-white">
-            <i class="fa-solid fa-xmark text-xl"></i>
-          </button>
+          <button onclick="app.closeWishlistModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
-
-        <nav class="space-y-2">
-          <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium active-nav">
-            <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
-          </button>
-          
-          <button onclick="switchTab('inventory')" id="nav-inventory" class="w-full flex items-center justify-between px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
-            <div class="flex items-center gap-3 whitespace-nowrap">
-              <i class="fa-solid fa-box w-5"></i> Productos
-            </div>
-            <span class="text-xs font-bold bg-slate-800 text-indigo-400 px-2 py-0.5 rounded-md border border-slate-700" id="total-count-badge">0</span>
-          </button>
-
-          <button onclick="switchTab('movements')" id="nav-movements" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
-            <i class="fa-solid fa-arrow-right-arrow-left w-5"></i> Historial
-          </button>
-
-          <button onclick="switchTab('distributors')" id="nav-distributors" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium hidden">
-            <i class="fa-solid fa-address-book w-5"></i> Contactos
-          </button>
-
-          <button onclick="switchTab('requests')" id="nav-requests" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium">
-            <i class="fa-solid fa-comment-dots w-5"></i> Peticiones
-          </button>
-
-          <button onclick="switchTab('users')" id="nav-users" class="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 rounded-xl transition font-medium hidden">
-            <i class="fa-solid fa-users-gear w-5"></i> Gestión Usuarios
-          </button>
-        </nav>
+        <div id="wishlist-items-container" class="space-y-3 max-h-96 overflow-y-auto pr-1"></div>
       </div>
+    </div>
+  </div>
 
-      <!-- Perfil de usuario y Opciones -->
-      <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between mt-6 md:mt-0">
-        <div>
-          <p id="user-display-name" class="text-sm font-bold text-white"></p>
-          <p id="user-display-role" class="text-xs text-indigo-400 font-semibold uppercase"></p>
-        </div>
-        <div class="flex items-center gap-1">
-          <button onclick="openChangePasswordModal()" title="Cambiar Contraseña" class="text-slate-400 hover:text-amber-400 transition p-2">
-            <i class="fa-solid fa-key text-base"></i>
-          </button>
-          <button onclick="handleLogout()" title="Cerrar Sesión" class="text-slate-400 hover:text-rose-400 transition p-2">
-            <i class="fa-solid fa-right-from-bracket text-base"></i>
-          </button>
-        </div>
-      </div>
-    </aside>
-
-    <!-- Contenido Principal -->
-    <main class="flex-1 p-4 md:p-8 overflow-y-auto w-full">
-      <!-- Header -->
-      <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-        <div>
-          <h2 id="page-title" class="text-2xl font-bold text-white">Panel principal</h2>
-          <p id="page-subtitle" class="text-sm text-slate-400 mt-1">Estado general y movimientos en tiempo real</p>
-        </div>
-        <div class="flex items-center gap-4 w-full sm:w-auto">
-          <button onclick="openMovementModal()" id="btn-new-movement" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition">
-            <i class="fa-solid fa-plus"></i> Registrar Entrada / Salida
-          </button>
-        </div>
-      </header>
-
-      <!-- Tab 1: Dashboard -->
-      <div id="tab-dashboard" class="tab-content space-y-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-            <p class="text-slate-400 text-sm font-medium">Total Productos</p>
-            <h3 id="stat-total-products" class="text-3xl font-extrabold text-white mt-1">0</h3>
+  <!-- MODAL DE CHECKOUT OPTIMIZADO PARA COLOMBIA & PASARELAS -->
+  <div id="checkout-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div onclick="app.closeCheckoutModal()" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 z-10">
+        
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+          <div class="flex items-center gap-2">
+            <i data-lucide="shield-check" class="w-6 h-6 text-emerald-600"></i>
+            <h3 class="font-extrabold font-display text-xl text-slate-900">Finalizar Compra - Pago Seguro Colombia</h3>
           </div>
+          <button onclick="app.closeCheckoutModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
 
-          <!-- Tarjeta Unidades en Stock -->
-          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
+        <div class="flex items-center justify-between mb-8 px-4">
+          <div class="flex items-center gap-2">
+            <div id="step-indicator-1" class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center border-2 border-blue-600">1</div>
+            <span class="text-xs font-bold text-slate-800">Envío Colombia</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-slate-200 mx-3"></div>
+          <div class="flex items-center gap-2">
+            <div id="step-indicator-2" class="w-8 h-8 rounded-full bg-white text-slate-400 font-bold text-xs flex items-center justify-center border-2 border-slate-300">2</div>
+            <span class="text-xs font-bold text-slate-800">Pasarela Pago</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-slate-200 mx-3"></div>
+          <div class="flex items-center gap-2">
+            <div id="step-indicator-3" class="w-8 h-8 rounded-full bg-white text-slate-400 font-bold text-xs flex items-center justify-center border-2 border-slate-300">3</div>
+            <span class="text-xs font-bold text-slate-800">Confirmación</span>
+          </div>
+        </div>
+
+        <!-- PASO 1: DATOS DE ENVÍO COLOMBIA -->
+        <div id="checkout-step-1" class="space-y-4">
+          <h4 class="text-sm font-bold text-slate-900">1. Datos de Destino en Colombia</h4>
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <p class="text-slate-400 text-sm font-medium mb-1">Unidades en Stock</p>
-              <div class="relative">
-                <input 
-                  type="text" 
-                  id="select-units-filter-search" 
-                  onfocus="filterUnitsProducts(true)"
-                  oninput="filterUnitsProducts(false)" 
-                  placeholder="📦 Todas las unidades (Total)" 
-                  value="📦 Todas las unidades (Total)"
-                  autocomplete="off"
-                  class="w-full bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:border-indigo-500 truncate cursor-pointer"
-                >
-                <input type="hidden" id="select-units-filter-id" value="all">
-                <div id="select-units-filter-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
-              </div>
+              <label class="text-[11px] font-bold text-slate-500 uppercase">Nombre Completo *</label>
+              <input type="text" id="co-name" value="Carlos Andrés Pérez" class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
             </div>
-            <h3 id="stat-total-units" class="text-2xl md:text-3xl font-extrabold text-indigo-400 truncate">0</h3>
-          </div>
-          
-          <!-- Tarjeta Valor Inventario -->
-          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
             <div>
-              <p class="text-slate-400 text-sm font-medium mb-1">Valor Inventario</p>
-              <div class="relative">
-                <input 
-                  type="text" 
-                  id="select-product-filter-search" 
-                  onfocus="filterValuationProducts(true)"
-                  oninput="filterValuationProducts(false)" 
-                  placeholder="📦 Todos los productos (Total)" 
-                  value="📦 Todos los productos (Total)"
-                  autocomplete="off"
-                  class="w-full bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:border-emerald-500 truncate cursor-pointer"
-                >
-                <input type="hidden" id="select-product-filter-id" value="all">
-                <div id="select-product-filter-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
-              </div>
+              <label class="text-[11px] font-bold text-slate-500 uppercase">Cédula / NIT (Para Facturación) *</label>
+              <input type="text" id="co-doc" value="1020304050" class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
             </div>
-            <h3 id="stat-total-value" class="text-2xl md:text-3xl font-extrabold text-emerald-400 truncate">$0</h3>
           </div>
 
-          <!-- Tarjeta Alertas Stock Bajo -->
-          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-2 relative">
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <div class="flex justify-between items-center mb-1">
-                <p class="text-slate-400 text-sm font-medium">Alertas Stock Bajo</p>
-                <button onclick="openLowStockModal()" title="Ver lista completa" class="text-xs text-rose-400 hover:text-rose-300 font-semibold underline">
-                  Ver lista
-                </button>
-              </div>
-              <div class="relative">
-                <input 
-                  type="text" 
-                  id="select-low-stock-filter-search" 
-                  onfocus="filterLowStockProducts(true)"
-                  oninput="filterLowStockProducts(false)" 
-                  placeholder="⚠️ Mostrar todos los críticos" 
-                  value="⚠️ Mostrar todos los críticos"
-                  autocomplete="off"
-                  class="w-full bg-slate-900 border border-slate-800 text-slate-200 text-xs rounded-lg p-2 focus:outline-none focus:border-rose-500 truncate cursor-pointer"
-                >
-                <input type="hidden" id="select-low-stock-filter-id" value="all">
-                <div id="select-low-stock-filter-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
-              </div>
+              <label class="text-[11px] font-bold text-slate-500 uppercase">Departamento *</label>
+              <select id="co-department" class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 font-semibold">
+                <option value="Cundinamarca">Bogotá D.C. / Cundinamarca</option>
+                <option value="Antioquia">Antioquia</option>
+                <option value="Valle del Cauca">Valle del Cauca</option>
+                <option value="Atlántico">Atlántico</option>
+                <option value="Santander">Santander</option>
+                <option value="Bolívar">Bolívar</option>
+                <option value="Eje Cafetero">Eje Cafetero (Caldas / Risaralda / Quindío)</option>
+                <option value="Otros">Otros Departamentos</option>
+              </select>
             </div>
-            <h3 id="stat-low-stock" class="text-2xl md:text-3xl font-extrabold text-rose-500 truncate">0</h3>
-          </div>
-        </div>
-
-        <!-- GRÁFICO DE EVOLUCIÓN -->
-        <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
             <div>
-              <h3 id="chart-title" class="text-lg font-bold text-white">Evolución del Valor del Inventario</h3>
-              <p class="text-xs text-slate-400">Proyección y seguimiento por semanas</p>
+              <label class="text-[11px] font-bold text-slate-500 uppercase">Ciudad / Municipio *</label>
+              <input type="text" id="co-city" value="Bogotá D.C." class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
             </div>
-            <span class="text-xs bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-full border border-indigo-500/20 font-semibold">
-              <i class="fa-solid fa-chart-line mr-1"></i> Tiempo Real
-            </span>
           </div>
-          <div class="relative w-full h-72">
-            <canvas id="valueTrendChart"></canvas>
-          </div>
-        </div>
-      </div>
 
-      <!-- Tab 2: Productos -->
-      <div id="tab-inventory" class="tab-content hidden space-y-6">
-        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-          <input type="text" id="search-input" onkeyup="filterProducts()" placeholder="🔍 Buscar producto por nombre o código..." class="w-full md:w-96 bg-slate-950 border border-slate-800 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500">
-          
-          <button onclick="openAddProductModal()" id="btn-add-product" class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition hidden">
-            <i class="fa-solid fa-square-plus"></i> Añadir Nuevo Producto
-          </button>
-        </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500 uppercase">Dirección Completa de Despacho *</label>
+            <input type="text" id="co-address" value="Calle 13 # 24 - 45, Bodega 3" class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
 
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
-          <table class="w-full text-left text-slate-300 min-w-[650px]">
-            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
-              <tr>
-                <th class="p-4">Código</th>
-                <th class="p-4">Producto</th>
-                <th class="p-4">Stock Actual</th>
-                <th class="p-4">Precio Compra Un.</th>
-                <th class="p-4">Precio Venta Un.</th>
-                <th class="p-4 text-emerald-400">PRE. VENT. + IVA</th>
-                <th class="p-4">OPCIONES</th>
-              </tr>
-            </thead>
-            <tbody id="inventory-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
-          </table>
-        </div>
-      </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] font-bold text-slate-500 uppercase">Celular / WhatsApp (Coordinación) *</label>
+              <input type="text" id="co-phone" value="+57 310 123 4567" class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-500 uppercase">Correo Electrónico *</label>
+              <input type="email" id="co-email" value="cliente@empresa.com" class="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+          </div>
 
-      <!-- Tab 3: Historial -->
-      <div id="tab-movements" class="tab-content hidden space-y-6">
-        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">BUSCAR (PRODUCTO / USUARIO)</label>
-            <input type="text" id="mov-filter-search" oninput="applyMovementFilters()" placeholder="🔍 Producto u operador..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">TIPO DE MOVIMIENTO</label>
-            <select id="mov-filter-type" onchange="applyMovementFilters()" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
-              <option value="ALL">Todos los tipos</option>
-              <option value="IN">➕ Entradas (+)</option>
-              <option value="OUT">➖ Salidas (-)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">DESDE FECHA</label>
-            <input type="date" id="mov-filter-date-start" onchange="applyMovementFilters()" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">HASTA FECHA</label>
-            <input type="date" id="mov-filter-date-end" onchange="applyMovementFilters()" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
-          </div>
-        </div>
-
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
-          <table class="w-full text-left text-slate-300 min-w-[650px]">
-            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
-              <tr>
-                <th class="p-4">Fecha y Hora</th>
-                <th class="p-4">Tipo</th>
-                <th class="p-4">Producto</th>
-                <th class="p-4">Cantidad</th>
-                <th class="p-4">Comentario / Observación</th>
-                <th class="p-4">Usuario</th>
-                <th class="p-4">Acción</th>
-              </tr>
-            </thead>
-            <tbody id="movements-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- TAB CONTACTOS -->
-      <div id="tab-distributors" class="tab-content hidden space-y-6">
-        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">BUSCAR POR NOMBRE O TELÉFONO</label>
-            <input type="text" id="dist-filter-search" oninput="applyDistributorFilters()" placeholder="🔍 Nombre, teléfono..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">FILTRAR POR ACCIÓN / TIPO</label>
-            <select id="dist-filter-category" onchange="applyDistributorFilters()" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
-              <option value="ALL">Todas las acciones</option>
-              <option value="PROVEEDORES">PROVEEDORES</option>
-              <option value="ENVÍOS">ENVÍOS</option>
-              <option value="CONTADURÍA">CONTADURÍA</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">FILTRAR POR MUNICIPIO</label>
-            <input type="text" id="dist-filter-municipality" oninput="applyDistributorFilters()" placeholder="🔍 Municipio..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
-          </div>
-          <div class="flex items-end">
-            <button onclick="openAddDistributorModal()" id="btn-add-distributor" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold p-3 rounded-xl transition shadow-lg shadow-amber-600/30 flex items-center justify-center gap-2 hidden">
-              <i class="fa-solid fa-user-plus"></i> Nuevo Contacto
+          <div class="pt-4 flex justify-end">
+            <button onclick="app.setCheckoutStep(2)" class="px-6 py-3 bg-slate-900 hover:bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5">
+              <span>Continuar al Pago</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
             </button>
           </div>
         </div>
 
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
-          <table class="w-full text-left text-slate-300 min-w-[650px]">
-            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
-              <tr>
-                <th class="p-4">Acción / Tipo</th>
-                <th class="p-4">Nombre Completo</th>
-                <th class="p-4">Contacto / Teléfono</th>
-                <th class="p-4">Municipio / Dirección</th>
-                <th class="p-4">Email / Notas</th>
-                <th class="p-4">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="distributors-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
-          </table>
+        <!-- PASO 2: PASARELAS DE PAGO COLOMBIA -->
+        <div id="checkout-step-2" class="space-y-5 hidden">
+          <h4 class="text-sm font-bold text-slate-900">2. Selecciona la Pasarela de Pago</h4>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <label class="cursor-pointer border-2 border-blue-600 rounded-2xl p-3 flex flex-col items-center justify-center text-center bg-blue-50/40">
+              <input type="radio" name="payment-gateway" value="wompi" checked class="sr-only" />
+              <span class="text-sm font-black text-slate-900">Wompi</span>
+              <span class="text-[10px] text-slate-600">Bancolombia/PSE/Nequi</span>
+            </label>
+
+            <label class="cursor-pointer border border-slate-200 hover:border-slate-400 rounded-2xl p-3 flex flex-col items-center justify-center text-center bg-white">
+              <input type="radio" name="payment-gateway" value="epayco" class="sr-only" />
+              <span class="text-sm font-black text-blue-700">ePayco</span>
+              <span class="text-[10px] text-slate-600">PSE / Tarjetas / Daviplata</span>
+            </label>
+
+            <label class="cursor-pointer border border-slate-200 hover:border-slate-400 rounded-2xl p-3 flex flex-col items-center justify-center text-center bg-white">
+              <input type="radio" name="payment-gateway" value="bold" class="sr-only" />
+              <span class="text-sm font-black text-red-600">Bold</span>
+              <span class="text-[10px] text-slate-600">PSE y Tarjetas</span>
+            </label>
+
+            <label class="cursor-pointer border border-slate-200 hover:border-slate-400 rounded-2xl p-3 flex flex-col items-center justify-center text-center bg-white">
+              <input type="radio" name="payment-gateway" value="whatsapp" class="sr-only" />
+              <span class="text-sm font-black text-emerald-600">WhatsApp</span>
+              <span class="text-[10px] text-slate-600">Acordar transferencia</span>
+            </label>
+          </div>
+
+          <!-- Resumen de Pago -->
+          <div class="flex items-center justify-between p-4 bg-slate-100 rounded-2xl">
+            <span class="text-xs font-bold text-slate-700">Total a Pagar (COP):</span>
+            <span id="checkout-summary-total" class="font-display font-black text-xl text-slate-950">$ 0</span>
+          </div>
+
+          <div class="pt-2 flex items-center justify-between">
+            <button onclick="app.setCheckoutStep(1)" class="px-4 py-2.5 text-slate-600 hover:text-slate-900 text-xs font-bold">← Volver a Datos</button>
+            <button id="pay-submit-btn" onclick="app.processPaymentOrder()" class="px-7 py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-xl transition-all flex items-center gap-2">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Pagar Ahora</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- PASO 3: CONFIRMACIÓN Y RECIBO -->
+        <div id="checkout-step-3" class="text-center py-6 space-y-4 hidden">
+          <div class="w-20 h-20 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-inner">
+            <i data-lucide="check-circle" class="w-10 h-10"></i>
+          </div>
+
+          <h3 class="font-display font-black text-2xl text-slate-950">¡Pedido y Pago Procesado!</h3>
+          <p class="text-xs text-slate-600 max-w-md mx-auto">Hemos recibido tu orden. Nuestro equipo en bodega preparará el despacho vía Servientrega/Envia y te notificaremos por WhatsApp.</p>
+
+          <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl max-w-sm mx-auto text-left space-y-2">
+            <div class="flex justify-between text-xs"><span class="text-slate-400">Número de Orden:</span><strong id="confirmed-order-id" class="text-slate-900 font-mono">ALX-984210</strong></div>
+            <div class="flex justify-between text-xs"><span class="text-slate-400">Transportadora:</span><span class="text-emerald-600 font-bold">Envío Nacional Express</span></div>
+            <div class="flex justify-between text-xs"><span class="text-slate-400">Estado:</span><span class="text-blue-600 font-bold">En Preparación Bodega</span></div>
+          </div>
+
+          <div class="pt-4 flex items-center justify-center gap-3">
+            <button onclick="app.closeCheckoutModal()" class="px-8 py-3 bg-slate-950 hover:bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md transition-all">Volver a la Tienda</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- REGION / CURRENCY MODAL -->
+  <div id="region-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div onclick="app.closeRegionModal()" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 sm:p-8 z-10">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center"><i data-lucide="globe" class="w-5 h-5"></i></div>
+            <div>
+              <h3 class="font-extrabold font-display text-lg text-slate-900">Configuración Regional</h3>
+              <p class="text-xs text-slate-400">Selecciona tu país para visualizar precios en divisa local</p>
+            </div>
+          </div>
+          <button onclick="app.closeRegionModal()" class="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div id="region-list-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1"></div>
+        <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Moneda principal: Peso Colombiano (COP)</span>
+          <button onclick="app.closeRegionModal()" class="px-5 py-2 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition-colors">Cerrar</button>
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Tab 4: Peticiones -->
-      <div id="tab-requests" class="tab-content hidden space-y-6">
-        <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
-          <h3 class="text-lg font-bold text-white">Enviar Petición o Sugerencia</h3>
-          <form onsubmit="handleSendRequest(event)" class="flex flex-col md:flex-row gap-3">
-            <input type="text" id="request-input" required placeholder="Ej: Me gustaría cambiar el color del panel o agregar exportación a Excel..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
-            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl transition flex items-center justify-center gap-2">
-              <i class="fa-solid fa-paper-plane"></i> Enviar Petición
-            </button>
-          </form>
-        </div>
-
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
-          <div class="p-4 bg-slate-900/50 border-b border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
-            <h4 class="font-bold text-white text-sm" id="requests-list-title">Lista de Peticiones</h4>
-            <input 
-              type="text" 
-              id="search-requests-input" 
-              onkeyup="filterRequestsList()" 
-              placeholder="🔍 Buscar en peticiones..." 
-              class="w-full md:w-72 bg-slate-900 border border-slate-800 text-white text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500"
-            >
+  <!-- CAMBIAR IMAGEN DE PRODUCTO -->
+  <div id="change-image-modal" class="admin-only fixed inset-0 z-50 hidden overflow-y-auto">
+    <div onclick="app.closeChangeImageModal()" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 sm:p-8 z-10">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center"><i data-lucide="image" class="w-5 h-5"></i></div>
+            <div>
+              <h3 class="font-extrabold font-display text-lg text-slate-900">Cambiar Foto del Producto</h3>
+              <p id="change-img-prod-name" class="text-xs text-slate-500 font-bold line-clamp-1">Nombre Producto</p>
+            </div>
           </div>
-          <table class="w-full text-left text-slate-300 min-w-[600px]">
-            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
-              <tr>
-                <th class="p-4">Fecha</th>
-                <th class="p-4">Usuario</th>
-                <th class="p-4">Detalle de la Petición</th>
-                <th class="p-4">Estado</th>
-                <th class="p-4">Acción</th>
-              </tr>
-            </thead>
-            <tbody id="requests-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
-          </table>
+          <button onclick="app.closeChangeImageModal()" class="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div class="mb-5 flex flex-col items-center">
+          <div class="w-48 h-48 rounded-2xl bg-slate-50 border border-slate-200 p-4 flex items-center justify-center overflow-hidden mb-2">
+            <img id="change-img-preview" src="" alt="Vista previa" class="w-full h-full object-contain mix-blend-multiply drop-shadow" />
+          </div>
+        </div>
+        <div class="space-y-3 mb-6">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">URL de la nueva imagen:</label>
+            <input id="change-img-url-input" type="url" placeholder="https://ejemplo.com/foto.jpg" oninput="app.previewImageChange(this.value)" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          <button type="button" onclick="app.closeChangeImageModal()" class="px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-900">Cancelar</button>
+          <button type="button" onclick="app.saveProductImage()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i><span>Guardar Foto</span></button>
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Tab 5: Gestión Usuarios -->
-      <div id="tab-users" class="tab-content hidden space-y-6">
-        <div class="flex justify-between items-center">
-          <h3 class="text-lg font-bold text-white">Crear Nuevo Usuario</h3>
+  <!-- AÑADIR NUEVO PRODUCTO -->
+  <div id="add-product-modal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div onclick="app.closeAddProductModal()" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 z-10">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><i data-lucide="plus-circle" class="w-5 h-5"></i></div>
+            <div>
+              <h3 class="font-extrabold font-display text-lg text-slate-900">Añadir Nuevo Producto</h3>
+              <p class="text-xs text-slate-400">Incorpora nuevos artículos al catálogo</p>
+            </div>
+          </div>
+          <button onclick="app.closeAddProductModal()" class="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
-        <form onsubmit="handleCreateUser(event)" class="bg-slate-950 p-6 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <form onsubmit="app.saveNewProduct(event)" class="space-y-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">Nombre de Usuario</label>
-            <input type="text" id="new-username" required placeholder="Ej: operador1" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre del Producto *</label>
+            <input id="new-prod-name" required type="text" placeholder="Ej: Anillo O-Ring Nitrilo #210" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Categoría *</label>
+              <select id="new-prod-category" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 font-semibold text-slate-800">
+                <option value="plomeria-pvc">Plomería & Conexiones PVC</option>
+                <option value="sellos-orings">Sellos & O-Rings</option>
+                <option value="herrajes-seguridad">Herrajes & Manijas</option>
+                <option value="ferreteria-industrial" selected>Ferretería & Construcción</option>
+                <option value="herramientas-agro">Herramientas & Taller</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Precio ($ COP) *</label>
+              <input id="new-prod-price" required type="number" step="any" placeholder="Ej: 12500" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Cantidad en Stock</label>
+              <input id="new-prod-stock" type="number" value="100" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Proveedor / Distribuidor</label>
+              <input id="new-prod-provider" type="text" placeholder="Ej: Carlos PVC / Elkin Cardona" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">Contraseña</label>
-            <input type="password" id="new-password" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">URL de la Imagen</label>
+            <input id="new-prod-image" type="url" placeholder="https://ejemplo.com/foto.jpg" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600" />
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">Rol de Acceso</label>
-            <select id="new-role" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
-              <option value="operator">👷 Operador (Movimientos)</option>
-              <option value="viewer">👁️ Consultor (Lectura)</option>
-            </select>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción Técnica</label>
+            <textarea id="new-prod-desc" rows="2" placeholder="Especificaciones, material, medidas..." class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"></textarea>
           </div>
-          <div class="flex items-end">
-            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold p-3 rounded-xl transition">
-              <i class="fa-solid fa-user-plus mr-1"></i> Crear Usuario
-            </button>
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            <button type="button" onclick="app.closeAddProductModal()" class="px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-900">Cancelar</button>
+            <button type="submit" class="px-7 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i><span>Publicar</span></button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
 
-        <div class="bg-slate-950 rounded-2xl border border-slate-800 overflow-x-auto">
-          <table class="w-full text-left text-slate-300 min-w-[500px]">
-            <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
-              <tr>
-                <th class="p-4">Usuario</th>
-                <th class="p-4">Rol</th>
-                <th class="p-4">Fecha Creación</th>
-                <th class="p-4">Acción</th>
-              </tr>
-            </thead>
-            <tbody id="users-table-body" class="divide-y divide-slate-800 text-sm"></tbody>
-          </table>
+  <!-- PANEL ADMIN Y EXPORTACIÓN -->
+  <div id="admin-modal" class="admin-only fixed inset-0 z-50 hidden overflow-y-auto">
+    <div onclick="app.closeAdminModal()" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 z-10">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center"><i data-lucide="settings" class="w-5 h-5"></i></div>
+            <div>
+              <h3 class="font-extrabold font-display text-lg text-slate-900">Panel de Gestión & Exportación</h3>
+              <p class="text-xs text-slate-400">Total productos en catálogo: <strong id="admin-total-count" class="text-slate-800">420</strong></p>
+            </div>
+          </div>
+          <button onclick="app.closeAdminModal()" class="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div class="space-y-4 mb-6">
+          <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+            <h4 class="text-xs font-bold text-slate-800 uppercase mb-1">1. Descargar catálogo actualizado para Vercel</h4>
+            <button type="button" onclick="app.exportCatalogFile()" class="mt-2 px-5 py-2.5 bg-slate-900 hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2"><i data-lucide="download" class="w-4 h-4"></i><span>Descargar products.js</span></button>
+          </div>
+        </div>
+        <div class="pt-4 border-t border-slate-100 flex justify-end">
+          <button type="button" onclick="app.closeAdminModal()" class="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors">Cerrar</button>
         </div>
       </div>
-
-    </main>
-  </div>
-
-  <!-- MODAL CONTACTO (CREAR/EDITAR) -->
-  <div id="distributor-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
-      <h3 class="text-xl font-bold text-white" id="dist-modal-title">Añadir Contacto</h3>
-      <input type="hidden" id="dist-id">
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">ACCIÓN / CATEGORÍA</label>
-        <select id="dist-category" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
-          <option value="PROVEEDORES">PROVEEDORES</option>
-          <option value="ENVÍOS">ENVÍOS</option>
-          <option value="CONTADURÍA">CONTADURÍA</option>
-        </select>
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE COMPLETO</label>
-        <input type="text" id="dist-name" required placeholder="Ej: Elkin Cardona Alvarez" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CONTACTO / TELÉFONO</label>
-        <input type="text" id="dist-phone" placeholder="Ej: +57 3127060534" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">MUNICIPIO / DIRECCIÓN</label>
-        <input type="text" id="dist-municipality" placeholder="Ej: Pereira" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">EMAIL / OBSERVACIONES</label>
-        <input type="text" id="dist-notes" placeholder="Ej: contacto@ejemplo.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
-      </div>
-
-      <div class="flex gap-3 justify-end pt-2">
-        <button onclick="closeDistributorModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
-        <button onclick="saveDistributor()" class="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-500 shadow-lg shadow-amber-600/30">Guardar</button>
-      </div>
     </div>
   </div>
 
-  <!-- MODAL PRODUCTOS STOCK BAJO -->
-  <div id="low-stock-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-2xl shadow-2xl space-y-4">
-      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-        <h3 class="text-xl font-bold text-white flex items-center gap-2">
-          <i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Productos en Stock Bajo
-        </h3>
-        <button onclick="closeLowStockModal()" class="text-slate-400 hover:text-white transition">
-          <i class="fa-solid fa-xmark text-xl"></i>
-        </button>
-      </div>
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-md"></div>
 
-      <div class="max-h-96 overflow-y-auto border border-slate-800 rounded-xl">
-        <table class="w-full text-left text-slate-300">
-          <thead class="bg-slate-900 border-b border-slate-800 text-xs text-slate-400 uppercase font-semibold">
-            <tr>
-              <th class="p-3">Código</th>
-              <th class="p-3">Producto</th>
-              <th class="p-3">Stock Actual</th>
-              <th class="p-3">Mínimo</th>
-              <th class="p-3">Acción</th>
-            </tr>
-          </thead>
-          <tbody id="low-stock-modal-body" class="divide-y divide-slate-800 text-sm"></tbody>
-        </table>
-      </div>
-
-      <div class="flex justify-end pt-2">
-        <button onclick="closeLowStockModal()" class="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cerrar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL REGISTRAR MOVIMIENTO -->
-  <div id="movement-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4 relative">
-      <h3 class="text-xl font-bold text-white">Registrar Entrada / Salida</h3>
-      
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">TIPO DE MOVIMIENTO</label>
-        <select id="mov-type" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
-          <option value="IN">➕ Entrada (Suma al Stock)</option>
-          <option value="OUT">➖ Salida (Resta del Stock)</option>
-        </select>
-      </div>
-
-      <div class="relative">
-        <label class="block text-xs font-semibold text-slate-400 mb-1">PRODUCTO</label>
-        <input 
-          type="text" 
-          id="mov-product-search" 
-          oninput="filterModalProducts()" 
-          placeholder="🔍 Escribe para buscar producto..." 
-          autocomplete="off"
-          class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500"
-        >
-        <input type="hidden" id="mov-product-id">
-        <div id="mov-product-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto z-50 shadow-2xl divide-y divide-slate-800"></div>
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CANTIDAD</label>
-        <input type="number" id="mov-qty" min="1" value="1" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">COMENTARIO / OBSERVACIÓN (Obligatorio)</label>
-        <textarea id="mov-comment" placeholder="Motivo, número de factura, cliente o proveedor..." class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white h-24 focus:outline-none"></textarea>
-      </div>
-
-      <div class="flex gap-3 justify-end pt-2">
-        <button onclick="closeMovementModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
-        <button onclick="saveMovement()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 shadow-lg shadow-indigo-600/30">Guardar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL EDITAR PRODUCTO -->
-  <div id="edit-product-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
-      <h3 class="text-xl font-bold text-white">Editar Datos del Producto</h3>
-      <input type="hidden" id="edit-product-id">
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE DEL PRODUCTO</label>
-        <input type="text" id="edit-product-name" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">UNIDADES EN STOCK</label>
-        <input type="number" id="edit-product-stock" min="0" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
-      </div>
-
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 mb-1">PRECIO COMPRA</label>
-          <input type="number" step="0.01" id="edit-purchase-price" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-amber-400 mb-1">PRECIO VENTA</label>
-          <input type="number" step="0.01" id="edit-sale-price" oninput="updateVatPreview('edit-sale-price', 'edit-sale-price-vat')" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500">
-        </div>
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-emerald-400 mb-1">PRE. VENT. + IVA (+19%)</label>
-        <input type="text" id="edit-sale-price-vat" readonly disabled class="w-full bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-emerald-400 font-bold cursor-not-allowed">
-      </div>
-
-      <div class="flex gap-3 justify-end pt-2">
-        <button onclick="closeEditProductModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
-        <button onclick="saveProductEdit()" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 shadow-lg shadow-indigo-600/30">Guardar Cambios</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL CREAR NUEVO PRODUCTO -->
-  <div id="add-product-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
-      <h3 class="text-xl font-bold text-white">Añadir Nuevo Producto</h3>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CÓDIGO (Ej: PROD-421)</label>
-        <input type="text" id="add-product-code" placeholder="PROD-XXX" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">NOMBRE DEL PRODUCTO</label>
-        <input type="text" id="add-product-name" placeholder="Ej: Tornillo M6 x 20mm" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">STOCK INICIAL</label>
-        <input type="number" id="add-product-stock" min="0" value="0" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
-      </div>
-
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 mb-1">PRECIO COMPRA</label>
-          <input type="number" step="0.01" id="add-purchase-price" value="0" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-amber-400 mb-1">PRECIO VENTA</label>
-          <input type="number" step="0.01" id="add-sale-price" value="0" oninput="updateVatPreview('add-sale-price', 'add-sale-price-vat')" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-emerald-500">
-        </div>
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-emerald-400 mb-1">PRE. VENT. + IVA (+19%)</label>
-        <input type="text" id="add-sale-price-vat" value="0.00" readonly disabled class="w-full bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-emerald-400 font-bold cursor-not-allowed">
-      </div>
-
-      <div class="flex gap-3 justify-end pt-2">
-        <button onclick="closeAddProductModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
-        <button onclick="saveNewProduct()" class="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 shadow-lg shadow-emerald-600/30">Crear Producto</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL CAMBIAR CONTRASEÑA -->
-  <div id="change-password-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center hidden z-50 p-4">
-    <div class="bg-slate-950 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
-      <h3 class="text-xl font-bold text-white">Cambiar mi Contraseña</h3>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CONTRASEÑA ACTUAL</label>
-        <input type="password" id="pass-current" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">NUEVA CONTRASEÑA</label>
-        <input type="password" id="pass-new" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
-      </div>
-
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 mb-1">CONFIRMAR NUEVA CONTRASEÑA</label>
-        <input type="password" id="pass-confirm" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500">
-      </div>
-
-      <div class="flex gap-3 justify-end pt-2">
-        <button onclick="closeChangePasswordModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700">Cancelar</button>
-        <button onclick="saveNewPassword()" class="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-500 shadow-lg shadow-amber-600/30">Actualizar Contraseña</button>
-      </div>
-    </div>
-  </div>
-
+  <!-- Carga de Scripts -->
+  <script src="products.js"></script>
   <script src="app.js"></script>
+  <script src="supabase-sync.js"></script>
 </body>
 </html>
