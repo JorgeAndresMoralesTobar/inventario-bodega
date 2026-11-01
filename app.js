@@ -13,11 +13,7 @@ let currentUser = null;
 let trendChart = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-  const savedUser = localStorage.getItem("inventory_user");
-  if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-    showAppScreen();
-  }
+  restoreSession();
 
   // Cerrar desplegables de búsqueda al hacer clic fuera
   document.addEventListener("click", (e) => {
@@ -35,6 +31,37 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+// SESIÓN: se guarda solo un código temporal (token), nunca la contraseña
+async function restoreSession() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("inventory_user")); } catch (e) { /* ignorar */ }
+  // Formato antiguo (guardaba la contraseña): se borra y se pide iniciar sesión de nuevo
+  if (!saved || !saved.token) {
+    localStorage.removeItem("inventory_user");
+    return;
+  }
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.rpc("app_whoami", { p_token: saved.token });
+  if (error || !data) {
+    localStorage.removeItem("inventory_user");
+    return;
+  }
+  currentUser = data;
+  localStorage.setItem("inventory_user", JSON.stringify(currentUser));
+  showAppScreen();
+}
+
+// Si la sesión caducó, vuelve a la pantalla de acceso
+function handleRpcError(error, prefix) {
+  const msg = (error && error.message) || "Error desconocido";
+  if (/sesi[oó]n expir/i.test(msg)) {
+    alert("⚠️ Tu sesión expiró. Vuelve a iniciar sesión.");
+    handleLogout();
+    return;
+  }
+  alert(prefix + msg);
+}
 
 // ABRIR / CERRAR MENÚ MÓVIL
 function toggleMobileMenu() {
@@ -62,12 +89,10 @@ async function handleLogin(e) {
 
   if (!supabaseClient) return;
 
-  const { data, error } = await supabaseClient
-    .from("app_users")
-    .select("*")
-    .eq("username", usernameInput)
-    .eq("password", passwordInput)
-    .single();
+  const { data, error } = await supabaseClient.rpc("app_login", {
+    p_username: usernameInput,
+    p_password: passwordInput
+  });
 
   if (error || !data) {
     alert("⚠️ Usuario o contraseña incorrectos.");
@@ -82,6 +107,9 @@ async function handleLogin(e) {
 }
 
 function handleLogout() {
+  if (supabaseClient && currentUser && currentUser.token) {
+    supabaseClient.rpc("app_logout", { p_token: currentUser.token }).then(() => {}, () => {});
+  }
   localStorage.removeItem("inventory_user");
   currentUser = null;
   document.getElementById("app-screen").classList.add("hidden");
@@ -162,13 +190,13 @@ async function saveNewPassword() {
   const newPass = document.getElementById("pass-new").value.trim();
   const confirmPass = document.getElementById("pass-confirm").value.trim();
 
-  if (currentPass !== currentUser.password) {
-    alert("⚠️ La contraseña actual no es correcta.");
+  if (!currentPass) {
+    alert("⚠️ Escribe tu contraseña actual.");
     return;
   }
 
-  if (!newPass) {
-    alert("⚠️ La nueva contraseña no puede estar vacía.");
+  if (newPass.length < 6) {
+    alert("⚠️ La nueva contraseña debe tener al menos 6 caracteres.");
     return;
   }
 
@@ -177,18 +205,17 @@ async function saveNewPassword() {
     return;
   }
 
-  const { error } = await supabaseClient
-    .from("app_users")
-    .update({ password: newPass })
-    .eq("id", currentUser.id);
+  const { error } = await supabaseClient.rpc("app_change_password", {
+    p_token: currentUser.token,
+    p_current: currentPass,
+    p_new: newPass
+  });
 
   if (error) {
-    alert("Error al actualizar la contraseña: " + error.message);
+    handleRpcError(error, "⚠️ ");
     return;
   }
 
-  currentUser.password = newPass;
-  localStorage.setItem("inventory_user", JSON.stringify(currentUser));
   alert("✅ ¡Contraseña actualizada con éxito!");
   closeChangePasswordModal();
 }
@@ -211,11 +238,6 @@ function subscribeRealtime() {
     })
     .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, async () => {
       await fetchRequests();
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "app_users" }, async () => {
-      if (currentUser.role === 'admin') {
-        await fetchUsers();
-      }
     })
     .subscribe();
 }
@@ -247,8 +269,13 @@ async function fetchMovements() {
 
 async function fetchUsers() {
   if (!supabaseClient) return;
-  const { data, error } = await supabaseClient.from("app_users").select("*").order("id", { ascending: true });
-  if (!error && data) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  const { data, error } = await supabaseClient.rpc("app_list_users", { p_token: currentUser.token });
+  if (error) {
+    handleRpcError(error, "Error al cargar usuarios: ");
+    return;
+  }
+  if (data) {
     systemUsers = data;
     renderUsers();
   }
@@ -267,13 +294,14 @@ async function changeUserRole(userId, newRole) {
     return;
   }
 
-  const { error } = await supabaseClient
-    .from("app_users")
-    .update({ role: newRole })
-    .eq("id", userId);
+  const { error } = await supabaseClient.rpc("app_set_role", {
+    p_token: currentUser.token,
+    p_id: userId,
+    p_role: newRole
+  });
 
   if (error) {
-    alert("Error al cambiar el rol: " + error.message);
+    handleRpcError(error, "Error al cambiar el rol: ");
     await fetchUsers();
     return;
   }
@@ -322,10 +350,20 @@ async function handleCreateUser(e) {
   const password = document.getElementById("new-password").value.trim();
   const role = document.getElementById("new-role").value;
 
-  const { error } = await supabaseClient.from("app_users").insert([{ username, password, role }]);
+  if (password.length < 6) {
+    alert("⚠️ La contraseña debe tener al menos 6 caracteres.");
+    return;
+  }
+
+  const { error } = await supabaseClient.rpc("app_create_user", {
+    p_token: currentUser.token,
+    p_username: username,
+    p_password: password,
+    p_role: role
+  });
 
   if (error) {
-    alert("Error al crear usuario: " + error.message);
+    handleRpcError(error, "Error al crear usuario: ");
     return;
   }
 
@@ -339,10 +377,15 @@ async function deleteUser(userId) {
   if (currentUser.role !== 'admin') return;
   if (!confirm("¿Seguro que deseas eliminar este usuario?")) return;
 
-  const { error } = await supabaseClient.from("app_users").delete().eq("id", userId);
-  if (!error) {
-    await fetchUsers();
+  const { error } = await supabaseClient.rpc("app_delete_user", {
+    p_token: currentUser.token,
+    p_id: userId
+  });
+  if (error) {
+    handleRpcError(error, "Error al eliminar el usuario: ");
+    return;
   }
+  await fetchUsers();
 }
 
 // CONTACTOS / DISTRIBUIDORES
