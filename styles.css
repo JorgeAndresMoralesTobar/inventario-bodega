@@ -1,19 +1,92 @@
-.active-nav {
-  background-color: #1e1b4b;
-  color: #818cf8;
-  border-left: 4px solid #6366f1;
+/* Alumax JT · Bodega — capa visual oscura "pro". Los colores base vienen de la config de Tailwind en index.html. */
+
+:root {
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --cobalt: #3d74f5;
+  --cobalt-soft: rgba(61, 116, 245, .16);
+  --hair: rgba(255, 255, 255, .08);
 }
 
-::-webkit-scrollbar {
-  width: 8px;
+html { color-scheme: dark; }
+body { font-feature-settings: 'tnum' 1; }
+
+/* ---------- marca (O-ring) ---------- */
+.ax-mark { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 9px solid; border-color: #d3d7dd #6a7078 #2b2e33 #a3a9b1; box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
+.ax-mark--sm { width: 30px; height: 30px; border-width: 7px; }
+.ax-mark--lg { width: 72px; height: 72px; border-width: 15px; margin: 0 auto 6px; }
+
+/* ---------- acceso ---------- */
+#login-screen { background: #0a0b0d; overflow: hidden; }
+#login-screen > .ax-login-card { position: relative; z-index: 2; }
+#login-screen .ax-login-card {
+  background: rgba(23, 24, 27, .72); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--hair); border-radius: 28px; padding: 40px;
 }
-::-webkit-scrollbar-track {
-  background: #020617;
+#login-screen h2 { font-family: var(--font-display); font-size: 2rem; letter-spacing: -0.035em; line-height: 1.05; }
+#login-screen button[type="submit"] { border-radius: 999px; padding: 14px; box-shadow: none; }
+
+.ax-login-rings { position: absolute; left: 50%; bottom: -26%; width: min(160vw, 1300px); aspect-ratio: 1.5; transform: translateX(-50%); perspective: 1300px; pointer-events: none; z-index: 1; opacity: 0; animation: ax-rise 1.4s .1s cubic-bezier(.16,1,.3,1) forwards; }
+.ax-ring {
+  --t: 54px; --d: 80%; --tilt: 66deg; --sp: 26s; --lite: #aab0b8; --from: 0deg;
+  position: absolute; left: 50%; top: 50%; width: var(--d); aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%, -50%) rotateX(var(--tilt)) rotateZ(0deg);
+  background:
+    radial-gradient(circle closest-side, transparent calc(100% - var(--t)), rgba(255,255,255,.18) calc(100% - var(--t) * .5), transparent 100%),
+    conic-gradient(from var(--from), #0b0c0e 0deg, #2a2d32 40deg, var(--lite) 62deg, #2a2d32 88deg, #0b0c0e 140deg, #191b1e 200deg, color-mix(in srgb, var(--lite) 55%, #0b0c0e) 244deg, #17191c 290deg, #0b0c0e 360deg);
+  -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - var(--t)), #000 calc(100% - var(--t) + 1px));
+          mask: radial-gradient(circle closest-side, transparent calc(100% - var(--t)), #000 calc(100% - var(--t) + 1px));
+  animation: ax-spin var(--sp) linear infinite;
 }
-::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 4px;
+.ax-ring--b { --d: 58%; --t: 40px; --tilt: 60deg; --sp: 34s; --lite: #5f8dff; --from: 90deg; animation-direction: reverse; }
+.ax-ring--c { --d: 36%; --t: 28px; --tilt: 54deg; --sp: 22s; --lite: #d9a441; --from: 200deg; }
+@keyframes ax-spin { to { transform: translate(-50%, -50%) rotateX(var(--tilt)) rotateZ(360deg); } }
+@keyframes ax-rise { from { opacity: 0; transform: translateX(-50%) translateY(60px) scale(.94); } to { opacity: .9; transform: translateX(-50%) translateY(0) scale(1); } }
+
+/* ---------- menú lateral ---------- */
+#sidebar-menu { background: rgba(14, 15, 17, .86) !important; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-right: 1px solid var(--hair) !important; }
+#sidebar-menu h1 { font-family: var(--font-display); letter-spacing: -0.02em; }
+#sidebar-menu nav button { border-radius: 14px; font-weight: 600; font-size: .95rem; transition: background .2s, color .2s; }
+#sidebar-menu nav button i { opacity: .75; }
+.active-nav { background-color: var(--cobalt-soft) !important; color: #fff !important; border-left: 0 !important; }
+.active-nav i { color: #7aa2ff; opacity: 1 !important; }
+
+/* ---------- cabecera y tarjetas ---------- */
+main > header { background: transparent !important; border: 0 !important; padding: 4px 0 !important; margin-bottom: 28px !important; }
+#page-title { font-family: var(--font-display); font-size: clamp(2rem, 3.6vw, 3rem) !important; letter-spacing: -0.04em; line-height: 1.02; }
+.tab-content > .grid > div, .tab-content > div.bg-slate-950 { border-color: var(--hair) !important; }
+#tab-dashboard .grid > div { padding: 24px; border-radius: 24px; transition: transform .3s cubic-bezier(.16,1,.3,1), border-color .3s; }
+#tab-dashboard .grid > div:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.16) !important; }
+#stat-total-products, #stat-total-units, #stat-total-value, #stat-low-stock {
+  font-family: var(--font-display); letter-spacing: -0.04em; font-size: clamp(1.6rem, 2vw, 2.2rem) !important; line-height: 1.1; font-weight: 700 !important;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+#chart-title { font-family: var(--font-display); letter-spacing: -0.03em; font-size: 1.4rem; }
+
+/* ---------- tablas ---------- */
+table thead th { text-transform: none !important; letter-spacing: 0 !important; font-weight: 600; font-size: .8rem; color: #9aa0a8; padding-top: 14px; padding-bottom: 14px; }
+table thead { background: rgba(255,255,255,.03) !important; }
+table tbody tr { transition: background .15s; }
+table tbody tr:hover { background: rgba(255,255,255,.035); }
+.divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: var(--hair) !important; }
+div.bg-slate-950.overflow-x-auto { border-radius: 24px; }
+
+/* ---------- formularios y botones ---------- */
+label { text-transform: none; }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 4px var(--cobalt-soft); }
+button[class*="bg-indigo-600"], button[class*="bg-emerald-600"], button[class*="bg-amber-600"], button[class*="bg-rose-600"] { border-radius: 999px !important; box-shadow: none !important; }
+button:focus-visible, a:focus-visible { outline: 2px solid #7aa2ff; outline-offset: 2px; }
+
+/* ---------- ventanas emergentes ---------- */
+[id$="-modal"].fixed { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+[id$="-modal"] > div { border-radius: 28px !important; border-color: var(--hair) !important; }
+[id$="-modal"] h3 { font-family: var(--font-display); letter-spacing: -0.03em; }
+
+/* ---------- barra de desplazamiento ---------- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2b2e33; border-radius: 99px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #3a3e44; background-clip: padding-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ax-ring, .ax-login-rings { animation: none; opacity: .9; }
+  #tab-dashboard .grid > div { transition: none; }
 }

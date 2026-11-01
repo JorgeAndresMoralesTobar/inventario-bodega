@@ -935,6 +935,22 @@ function switchTab(tabName) {
   const targetNav = document.getElementById(`nav-${tabName}`);
   if (targetNav) targetNav.classList.add('active-nav');
 
+  // Título y subtítulo según la pestaña
+  const heads = {
+    dashboard: ['Panel principal', 'Estado general y movimientos en tiempo real'],
+    inventory: ['Productos', 'Stock, precios y ediciones'],
+    movements: ['Historial', 'Entradas y salidas registradas'],
+    distributors: ['Contactos', 'Proveedores, envíos y contaduría'],
+    requests: ['Peticiones', 'Solicitudes y sugerencias del equipo'],
+    users: ['Usuarios', 'Accesos y permisos']
+  };
+  if (heads[tabName]) {
+    const t = document.getElementById('page-title');
+    const st = document.getElementById('page-subtitle');
+    if (t) t.innerText = heads[tabName][0];
+    if (st) st.innerText = heads[tabName][1];
+  }
+
   // Cerrar el menú si estamos en un teléfono
   const sidebar = document.getElementById('sidebar-menu');
   if (sidebar && window.innerWidth < 768) {

@@ -3,10 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Control de Inventario - Bodega</title>
+  <title>Alumax JT · Control de bodega</title>
   
   <!-- Estilos base y Tailwind CSS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Paleta grafito + cobalto: cambia todos los colores de la app sin tocar cada pantalla.
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'], display: ['"Bricolage Grotesque"', 'sans-serif'] },
+          borderRadius: { xl: '14px', '2xl': '22px' },
+          colors: {
+            slate: { 50:'#f4f5f7', 100:'#edeef0', 200:'#dde0e4', 300:'#c3c7cd', 400:'#9aa0a8', 500:'#6a7078', 600:'#4a4e55', 700:'#34373c', 800:'#26282c', 900:'#0c0d0f', 950:'#17181b' },
+            indigo: { 300:'#a9c1ff', 400:'#7aa2ff', 500:'#3d74f5', 600:'#1b5cf2', 700:'#1449c4', 900:'#0f2a6b', 950:'#0a1a42' }
+          }
+        }
+      }
+    }
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
 
@@ -19,11 +37,10 @@
 
   <!-- PANTALLA DE LOGIN -->
   <div id="login-screen" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl space-y-6">
+    <div class="ax-login-rings" aria-hidden="true"><div class="ax-ring"></div><div class="ax-ring ax-ring--b"></div><div class="ax-ring ax-ring--c"></div></div>
+    <div class="ax-login-card w-full max-w-md space-y-6">
       <div class="text-center space-y-2">
-        <div class="inline-flex bg-indigo-600 text-white p-4 rounded-2xl shadow-lg shadow-indigo-500/30 mb-2">
-          <i class="fa-solid fa-boxes-stacked text-3xl"></i>
-        </div>
+        <div class="ax-mark ax-mark--lg" aria-hidden="true"></div>
         <h2 class="text-2xl font-bold text-white">Acceso al Inventario</h2>
         <p class="text-xs text-slate-400">Ingresa tus credenciales para continuar</p>
       </div>
@@ -51,12 +68,10 @@
     <!-- BARRA SUPERIOR PARA MÓVILES -->
     <div class="md:hidden bg-slate-950 p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 z-30">
       <div class="flex items-center gap-3">
-        <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-500/30">
-          <i class="fa-solid fa-boxes-stacked text-lg"></i>
-        </div>
+        <div class="ax-mark ax-mark--sm" aria-hidden="true"></div>
         <div>
-          <h1 class="font-bold text-sm text-white">INVENTARIO</h1>
-          <span class="text-[10px] text-indigo-400 font-medium block">Control de Bodega</span>
+          <h1 class="font-bold text-sm text-white">Alumax JT</h1>
+          <span class="text-[10px] text-slate-400 font-medium block">Control de bodega</span>
         </div>
       </div>
       <button onclick="toggleMobileMenu()" class="text-slate-300 hover:text-white p-2 text-xl focus:outline-none">
@@ -69,12 +84,10 @@
       <div>
         <div class="flex items-center justify-between mb-8">
           <div class="flex items-center gap-3">
-            <div class="bg-indigo-600 text-white p-3 rounded-xl shadow-lg shadow-indigo-500/30">
-              <i class="fa-solid fa-boxes-stacked text-xl"></i>
-            </div>
+            <div class="ax-mark" aria-hidden="true"></div>
             <div>
-              <h1 class="font-bold text-lg text-white">INVENTARIO</h1>
-              <span class="text-xs text-indigo-400 font-medium">Control de Bodega</span>
+              <h1 class="font-bold text-lg text-white">Alumax JT</h1>
+              <span class="text-xs text-slate-400 font-medium">Control de bodega</span>
             </div>
           </div>
           <button onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-white">
@@ -134,8 +147,8 @@
       <!-- Header -->
       <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 bg-slate-950 p-4 rounded-2xl border border-slate-800">
         <div>
-          <h2 id="page-title" class="text-2xl font-bold text-white">Panel Principal</h2>
-          <p class="text-sm text-slate-400">Estado general y movimientos en tiempo real</p>
+          <h2 id="page-title" class="text-2xl font-bold text-white">Panel principal</h2>
+          <p id="page-subtitle" class="text-sm text-slate-400 mt-1">Estado general y movimientos en tiempo real</p>
         </div>
         <div class="flex items-center gap-4 w-full sm:w-auto">
           <button onclick="openMovementModal()" id="btn-new-movement" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition">
