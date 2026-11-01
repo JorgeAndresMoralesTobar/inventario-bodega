@@ -1,1078 +1,1418 @@
-// AURA LUXE COMMERCE - Main Application Controller (Alumax JT)
+// --- CONFIGURACIÓN SUPABASE ---
+const SUPABASE_URL = "https://apjxqtxxyctytybkkduc.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_zHSPfLOo02j4C3SIpxN7oA_m3YdnHcx";
 
-class StoreApp {
-  constructor() {
-    this.products = [...PRODUCTS];
-    this.filteredProducts = [...PRODUCTS];
-    this.cart = this.loadFromStorage('aura_cart', []);
-    this.wishlist = this.loadFromStorage('aura_wishlist', []);
-    this.currentCategory = 'todas';
-    this.currentProvider = 'todos';
-    this.searchQuery = '';
-    this.sortBy = 'featured';
-    this.maxPrice = 999999999;
-    this.appliedCoupon = null;
-    this.currentCurrency = this.loadFromStorage('aura_currency', 'COP');
-    this.currentCountry = this.loadFromStorage('aura_country', 'CO');
-    this.editingProductId = null;
-    this.quickViewProduct = null;
-    this.quickViewSelectedImage = 0;
-    this.quickViewSelectedSize = null;
-    this.quickViewSelectedColor = null;
-    this.quickViewQty = 1;
-    this.visibleCount = 24;
+const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
-    this.init();
-  }
+let products = [];
+let movements = [];
+let systemUsers = [];
+let appRequests = [];
+let distributors = [];
+let currentUser = null;
+let trendChart = null;
 
-  // --- CONTROL DE SESIÓN Y ADMIN ---
-  isAdmin() {
-    return localStorage.getItem('aura_admin_session') === 'true';
-  }
+document.addEventListener("DOMContentLoaded", () => {
+  restoreSession();
 
-  updateAdminUI() {
-    const adminElements = document.querySelectorAll('.admin-only');
-    adminElements.forEach(el => {
-      if (this.isAdmin()) {
-        el.classList.remove('hidden');
-      } else {
-        el.classList.add('hidden');
-      }
-    });
-  }
-
-  loginAdmin() {
-    const user = prompt("Acceso Administrador\nIngrese Usuario:");
-    const pass = prompt("Acceso Administrador\nIngrese Contraseña:");
-
-    if (user === "admin" && pass === "admin123") {
-      localStorage.setItem('aura_admin_session', 'true');
-      this.updateAdminUI();
-      this.renderProducts();
-      this.showToast("Modo Administrador", "Herramientas de edición activadas.", "success");
-    } else {
-      alert("Usuario o contraseña incorrectos.");
+  // Cerrar desplegables de búsqueda al hacer clic fuera
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#select-units-filter-search") && !e.target.closest("#select-units-filter-results")) {
+      const res = document.getElementById("select-units-filter-results");
+      if (res) res.classList.add("hidden");
     }
-  }
-
-  logoutAdmin() {
-    localStorage.removeItem('aura_admin_session');
-    this.updateAdminUI();
-    this.renderProducts();
-    this.showToast("Sesión Cerrada", "Modo cliente activo.", "info");
-  }
-
-  loadFromStorage(key, fallback) {
-    try {
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : fallback;
-    } catch (e) {
-      return fallback;
+    if (!e.target.closest("#select-product-filter-search") && !e.target.closest("#select-product-filter-results")) {
+      const res = document.getElementById("select-product-filter-results");
+      if (res) res.classList.add("hidden");
     }
-  }
-
-  saveToStorage(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      console.error("Storage error:", e);
+    if (!e.target.closest("#select-low-stock-filter-search") && !e.target.closest("#select-low-stock-filter-results")) {
+      const res = document.getElementById("select-low-stock-filter-results");
+      if (res) res.classList.add("hidden");
     }
+  });
+});
+
+// SESIÓN: se guarda solo un código temporal (token), nunca la contraseña
+async function restoreSession() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("inventory_user")); } catch (e) { /* ignorar */ }
+  // Formato antiguo (guardaba la contraseña): se borra y se pide iniciar sesión de nuevo
+  if (!saved || !saved.token) {
+    localStorage.removeItem("inventory_user");
+    return;
   }
-
-  init() {
-    this.populateProviderSelect();
-    this.renderCategoryPills();
-    this.renderProducts();
-    this.updateCartBadge();
-    this.updateWishlistBadge();
-    this.updateRegionDisplay();
-    this.setupEventListeners();
-    this.startFlashCountdown();
-    this.updateAdminUI();
-    this.refreshIcons();
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.rpc("app_whoami", { p_token: saved.token });
+  if (error || !data) {
+    localStorage.removeItem("inventory_user");
+    return;
   }
+  currentUser = data;
+  localStorage.setItem("inventory_user", JSON.stringify(currentUser));
+  showAppScreen();
+}
 
-  // --- BUSCADOR CON VISTA PREVIA EN VIVO (LIVE SEARCH DROPDOWN) ---
-  handleLiveSearch(query, mode = 'desktop') {
-    this.setSearch(query);
-
-    const dropdownId = mode === 'mobile' ? 'mobile-search-dropdown' : 'search-dropdown';
-    const resultsId = mode === 'mobile' ? 'mobile-search-dropdown-results' : 'search-dropdown-results';
-    const dropdown = document.getElementById(dropdownId);
-    const resultsContainer = document.getElementById(resultsId);
-
-    if (!dropdown || !resultsContainer) return;
-
-    const q = query.toLowerCase().trim();
-    if (q.length < 2) {
-      dropdown.classList.add('hidden');
-      return;
-    }
-
-    const matches = this.products.filter(p => 
-      p.name.toLowerCase().includes(q) ||
-      p.id.toLowerCase().includes(q) ||
-      (p.provider && p.provider.toLowerCase().includes(q))
-    ).slice(0, 5); // Mostrar máximo 5 sugerencias rápidas
-
-    if (matches.length === 0) {
-      resultsContainer.innerHTML = `<div class="p-3 text-xs text-slate-500 text-center">No hay coincidencias directas</div>`;
-    } else {
-      resultsContainer.innerHTML = matches.map(p => `
-        <div onclick="app.openQuickView('${p.id}'); app.hideSearchDropdown();" class="flex items-center gap-3 p-2 hover:bg-slate-100 rounded-xl cursor-pointer transition-colors">
-          <img src="${p.images[0]}" class="w-10 h-10 object-contain rounded-lg bg-white p-1 border border-slate-200" />
-          <div class="flex-1 min-w-0">
-            <h5 class="text-xs font-bold text-slate-900 truncate">${p.name}</h5>
-            <span class="text-[10px] text-slate-500">${p.categoryName} • ${p.provider || 'Alumax JT'}</span>
-          </div>
-          <strong class="text-xs font-bold text-blue-600">${this.formatPrice(p.price)}</strong>
-        </div>
-      `).join('');
-    }
-
-    dropdown.classList.remove('hidden');
-    this.refreshIcons();
+// Si la sesión caducó, vuelve a la pantalla de acceso
+function handleRpcError(error, prefix) {
+  const msg = (error && error.message) || "Error desconocido";
+  if (/sesi[oó]n expir/i.test(msg)) {
+    alert("⚠️ Tu sesión expiró. Vuelve a iniciar sesión.");
+    handleLogout();
+    return;
   }
-
-  hideSearchDropdown() {
-    const d1 = document.getElementById('search-dropdown');
-    const d2 = document.getElementById('mobile-search-dropdown');
-    if (d1) d1.classList.add('hidden');
-    if (d2) d2.classList.add('hidden');
-  }
-
-  // --- FILTRO DE PROVEEDORES ---
-  populateProviderSelect() {
-    const select = document.getElementById('filter-provider-select');
-    if (!select) return;
-
-    const providers = Array.from(new Set(this.products.map(p => p.provider).filter(Boolean))).sort();
-    select.innerHTML = `<option value="todos">Todos los distribuidores (${providers.length})</option>` +
-      providers.map(p => `<option value="${p}">${p}</option>`).join('');
-  }
-
-  setProviderFilter(provider) {
-    this.currentProvider = provider;
-    this.applyFilters();
-  }
-
-  // --- MONEDA Y REGIÓN ---
-  formatPrice(euroAmount) {
-    if (euroAmount === undefined || euroAmount === null) return '';
-    const curr = CURRENCIES[this.currentCurrency] || CURRENCIES.COP || { rate: 1, symbol: '$', decimals: 0, position: 'before' };
-    const converted = euroAmount * curr.rate;
-    
-    const formattedNumber = converted.toLocaleString('es-CO', {
-      minimumFractionDigits: curr.decimals,
-      maximumFractionDigits: curr.decimals
-    });
-
-    return curr.position === 'before' 
-      ? `${curr.symbol} ${formattedNumber}` 
-      : `${formattedNumber} ${curr.symbol}`;
-  }
-
-  updateRegionDisplay() {
-    const country = COUNTRIES.find(c => c.code === this.currentCountry) || COUNTRIES[0];
-    const curr = CURRENCIES[this.currentCurrency] || CURRENCIES.COP;
-
-    const labelEls = document.querySelectorAll('.global-region-label');
-    labelEls.forEach(el => {
-      el.innerHTML = `${country.flag} ${country.code} • ${curr.code} (${curr.symbol})`;
-    });
-
-    const heroPriceEl = document.getElementById('hero-product-price');
-    const heroOldPriceEl = document.getElementById('hero-product-oldprice');
-    if (heroPriceEl) heroPriceEl.textContent = this.formatPrice(87707.16);
-    if (heroOldPriceEl) heroOldPriceEl.textContent = this.formatPrice(105248.0);
-  }
-
-  openRegionModal() {
-    const modal = document.getElementById('region-modal');
-    const container = document.getElementById('region-list-container');
-    if (!modal || !container) return;
-
-    container.innerHTML = COUNTRIES.map(c => {
-      const isSelected = this.currentCountry === c.code;
-      const curr = CURRENCIES[c.currency] || { name: c.currency };
-      return `
-        <button 
-          onclick="app.setCountryAndCurrency('${c.code}', '${c.currency}')"
-          class="flex items-center justify-between p-3.5 rounded-2xl border transition-all text-left ${
-            isSelected 
-              ? 'border-blue-600 bg-blue-50/50 ring-2 ring-blue-500/20' 
-              : 'border-slate-200 hover:border-slate-400 bg-white'
-          }"
-        >
-          <div class="flex items-center gap-3">
-            <span class="text-2xl">${c.flag}</span>
-            <div>
-              <div class="font-bold text-slate-900 text-sm">${c.name}</div>
-              <div class="text-xs text-slate-500">${curr.name}</div>
-            </div>
-          </div>
-          ${isSelected ? '<span class="text-blue-600 font-bold text-xs bg-blue-100 px-2 py-0.5 rounded-full">Activo</span>' : ''}
-        </button>
-      `;
-    }).join('');
-
-    modal.classList.remove('hidden');
-    document.body.classList.add('overflow-hidden');
-    this.refreshIcons();
-  }
-
-  closeRegionModal() {
-    const modal = document.getElementById('region-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
-    }
-  }
-
-  setCountryAndCurrency(countryCode, currencyCode) {
-    this.currentCountry = countryCode;
-    this.currentCurrency = currencyCode;
-    this.saveToStorage('aura_country', this.currentCountry);
-    this.saveToStorage('aura_currency', this.currentCurrency);
-
-    this.updateRegionDisplay();
-    this.renderProducts();
-    this.renderCartItems();
-    if (this.quickViewProduct) {
-      this.renderQuickViewContent();
-    }
-    this.closeRegionModal();
-
-    const country = COUNTRIES.find(c => c.code === countryCode);
-    this.showToast('Región y Moneda actualizadas', `Comprando desde ${country.name} con divisa ${currencyCode}.`, 'success');
-  }
-
-  refreshIcons() {
-    if (window.lucide) {
-      window.lucide.createIcons();
-    }
-  }
-
-  // --- RELOJ CUENTA REGRESIVA ---
-  startFlashCountdown() {
-    const hoursEl = document.getElementById('cd-hours');
-    const minsEl = document.getElementById('cd-mins');
-    const secsEl = document.getElementById('cd-secs');
-
-    if (!hoursEl || !minsEl || !secsEl) return;
-
-    let totalSeconds = 14 * 3600 + 42 * 60 + 15;
-
-    setInterval(() => {
-      if (totalSeconds <= 0) totalSeconds = 24 * 3600;
-      totalSeconds--;
-
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = totalSeconds % 60;
-
-      hoursEl.textContent = String(h).padStart(2, '0');
-      minsEl.textContent = String(m).padStart(2, '0');
-      secsEl.textContent = String(s).padStart(2, '0');
-    }, 1000);
-  }
-
-  // --- CATEGORÍAS Y FILTROS ---
-  renderCategoryPills() {
-    const container = document.getElementById('category-pills-container');
-    if (!container) return;
-
-    const counts = { todas: this.products.length };
-    this.products.forEach(p => {
-      counts[p.category] = (counts[p.category] || 0) + 1;
-    });
-
-    container.innerHTML = CATEGORIES.map(cat => {
-      const isActive = this.currentCategory === cat.id;
-      const count = counts[cat.id] || 0;
-      return `
-        <button onclick="app.setCategory('${cat.id}')" class="category-pill ${isActive ? 'active' : ''}">
-          <span>${cat.name}</span>
-          <span class="pill-count">${count}</span>
-        </button>
-      `;
-    }).join('');
-
-    const catSelect = document.getElementById('filter-category-select');
-    if (catSelect) catSelect.value = this.currentCategory;
-  }
-
-  setCategory(catId) {
-    this.currentCategory = catId;
-    this.renderCategoryPills();
-    this.applyFilters();
-  }
-
-  applyFilters() {
-    let result = [...this.products];
-
-    if (this.currentCategory !== 'todas') {
-      result = result.filter(p => p.category === this.currentCategory);
-    }
-
-    if (this.currentProvider !== 'todos') {
-      result = result.filter(p => p.provider === this.currentProvider);
-    }
-
-    if (this.searchQuery.trim() !== '') {
-      const query = this.searchQuery.toLowerCase().trim();
-      result = result.filter(p => 
-        p.name.toLowerCase().includes(query) ||
-        (p.subtitle && p.subtitle.toLowerCase().includes(query)) ||
-        p.categoryName.toLowerCase().includes(query) ||
-        (p.description && p.description.toLowerCase().includes(query)) ||
-        (p.provider && p.provider.toLowerCase().includes(query))
-      );
-    }
-
-    result = result.filter(p => p.price <= this.maxPrice);
-
-    switch (this.sortBy) {
-      case 'price-asc':
-        result.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-desc':
-        result.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        result.sort((a, b) => b.rating - a.rating || b.reviewsCount - a.reviewsCount);
-        break;
-      case 'deals':
-        result.sort((a, b) => (b.isFlashDeal ? 1 : 0) - (a.isFlashDeal ? 1 : 0));
-        break;
-      case 'bestseller':
-        result.sort((a, b) => (b.isBestSeller ? 1 : 0) - (a.isBestSeller ? 1 : 0));
-        break;
-      case 'featured':
-      default:
-        break;
-    }
-
-    this.filteredProducts = result;
-    this.renderProducts();
-
-    const countEl = document.getElementById('products-count');
-    if (countEl) {
-      countEl.textContent = `${this.filteredProducts.length} producto${this.filteredProducts.length === 1 ? '' : 's'} disponible${this.filteredProducts.length === 1 ? '' : 's'}`;
-    }
-  }
-
-  setSort(sortValue) {
-    this.sortBy = sortValue;
-    this.applyFilters();
-  }
-
-  setSearch(query) {
-    this.searchQuery = query;
-    this.applyFilters();
-  }
-
-  // --- MOSTRAR PRODUCTOS EN GRILLA ---
-  renderProducts() {
-    const grid = document.getElementById('products-grid');
-    if (!grid) return;
-
-    if (this.filteredProducts.length === 0) {
-      grid.innerHTML = `
-        <div class="col-span-full py-16 text-center">
-          <div class="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
-            <i data-lucide="search-x" class="w-10 h-10"></i>
-          </div>
-          <h3 class="text-xl font-bold text-slate-800 mb-2">No se encontraron productos</h3>
-          <p class="text-slate-500 max-w-md mx-auto text-sm mb-6">
-            Intenta cambiar los filtros o los términos de búsqueda.
-          </p>
-          <button onclick="app.resetFilters()" class="px-6 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-full hover:bg-slate-800 transition-all shadow-md">
-            Ver todo el catálogo
-          </button>
-        </div>
-      `;
-      this.refreshIcons();
-      return;
-    }
-
-    const visible = this.filteredProducts.slice(0, this.visibleCount || 24);
-    const remaining = this.filteredProducts.length - visible.length;
-
-    grid.innerHTML = visible.map(product => {
-      const isFav = this.wishlist.includes(product.id);
-
-      let tagHtml = '';
-      if (product.isFlashDeal) {
-        tagHtml = `<span class="pc-tag pc-tag--flash">Oferta ${product.discount}</span>`;
-      } else if (product.isBestSeller) {
-        tagHtml = `<span class="pc-tag">Más vendido</span>`;
-      } else if (product.isNew) {
-        tagHtml = `<span class="pc-tag pc-tag--new">Nuevo</span>`;
-      }
-
-      const showOld = product.oldPrice && product.oldPrice > product.price;
-
-      return `
-        <article class="product-card" id="prod-${product.id}">
-          <div class="pc-media" onclick="app.openQuickView('${product.id}')">
-            ${tagHtml}
-            <button onclick="event.stopPropagation(); app.toggleWishlist('${product.id}')" class="pc-fav" aria-label="Añadir a favoritos">
-              <i data-lucide="heart" style="${isFav ? 'fill:#d93042;color:#d93042' : ''}"></i>
-            </button>
-            <img src="${product.images[0]}" alt="${product.name}" loading="lazy" class="card-img" />
-            <button onclick="event.stopPropagation(); app.openChangeImageModal('${product.id}')" class="pc-photo ${this.isAdmin() ? '' : 'hidden'}" aria-label="Cambiar foto">
-              <i data-lucide="camera"></i>
-            </button>
-          </div>
-
-          <div class="pc-body">
-            <span class="pc-cat">${product.categoryName} • ${product.provider || 'Alumax JT'}</span>
-            <h3 class="pc-name" onclick="app.openQuickView('${product.id}')" title="${product.name}">${product.name}</h3>
-            <div class="pc-foot">
-              <div class="pc-price">
-                <strong>${this.formatPrice(product.price)}</strong>
-                ${showOld ? `<s>${this.formatPrice(product.oldPrice)}</s>` : ''}
-              </div>
-              <button onclick="event.stopPropagation(); app.quickAddToCart('${product.id}')" class="pc-add" aria-label="Añadir a la cesta">Añadir</button>
-            </div>
-          </div>
-        </article>
-      `;
-    }).join('') + (remaining > 0 ? `
-      <div class="ax-more">
-        <button onclick="app.showMore()" class="ax-btn ax-btn--dark">Mostrar más productos</button>
-        <span>Quedan ${remaining} por ver</span>
-      </div>` : '');
-
-    this.refreshIcons();
-  }
-
-  showMore() {
-    this.visibleCount += 24;
-    this.renderProducts();
-  }
-
-  resetFilters() {
-    this.currentCategory = 'todas';
-    this.currentProvider = 'todos';
-    this.searchQuery = '';
-    this.sortBy = 'featured';
-
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) searchInput.value = '';
-    const provSelect = document.getElementById('filter-provider-select');
-    if (provSelect) provSelect.value = 'todos';
-    const catSelect = document.getElementById('filter-category-select');
-    if (catSelect) catSelect.value = 'todas';
-    const sortSelect = document.getElementById('sort-select');
-    if (sortSelect) sortSelect.value = 'featured';
-
-    this.renderCategoryPills();
-    this.applyFilters();
-  }
-
-  // --- VISTA RÁPIDA ---
-  openQuickView(productId) {
-    const product = this.products.find(p => p.id === productId);
-    if (!product) return;
-
-    this.quickViewProduct = product;
-    this.quickViewSelectedImage = 0;
-    this.quickViewSelectedSize = product.sizes ? product.sizes[0] : null;
-    this.quickViewSelectedColor = product.colors ? product.colors[0].name : null;
-    this.quickViewQty = 1;
-
-    this.renderQuickViewContent();
-
-    const modal = document.getElementById('quickview-modal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      document.body.classList.add('overflow-hidden');
-    }
-  }
-
-  closeQuickView() {
-    const modal = document.getElementById('quickview-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
-    }
-  }
-
-  renderQuickViewContent() {
-    const p = this.quickViewProduct;
-    if (!p) return;
-
-    const modalBody = document.getElementById('quickview-body');
-    if (!modalBody) return;
-
-    modalBody.innerHTML = `
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-        <div class="flex flex-col gap-4">
-          <div class="relative aspect-square bg-[#F8FAFC] rounded-3xl overflow-hidden border border-slate-100 flex items-center justify-center p-8">
-            <img id="qv-main-img" src="${p.images[0]}" alt="${p.name}" class="w-full h-full object-contain mix-blend-multiply drop-shadow-xl" />
-          </div>
-        </div>
-
-        <div class="flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span class="uppercase font-bold">${p.categoryName}</span>
-              <span class="text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full font-bold">✓ En Stock Colombia</span>
-            </div>
-
-            <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 font-display mb-2">${p.name}</h2>
-            <div class="text-xs text-slate-500 mb-4">Proveedor: <strong class="text-slate-800">${p.provider || 'Distribuciones Alumax JT'}</strong></div>
-
-            <div class="flex items-baseline gap-3 mb-6 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-              <span class="text-3xl font-black text-slate-900 font-display">${this.formatPrice(p.price)}</span>
-            </div>
-
-            <p class="text-sm text-slate-600 leading-relaxed mb-6">${p.description || 'Producto ferretero e industrial de alta resistencia.'}</p>
-          </div>
-
-          <div class="pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center gap-4">
-            <div class="flex items-center border border-slate-200 rounded-2xl p-1 bg-white justify-between w-full sm:w-auto">
-              <button onclick="app.updateQuickViewQty(-1)" class="w-10 h-10 rounded-xl hover:bg-slate-100 font-bold text-slate-700">-</button>
-              <span id="qv-qty" class="w-12 text-center font-extrabold text-slate-900 text-sm">1</span>
-              <button onclick="app.updateQuickViewQty(1)" class="w-10 h-10 rounded-xl hover:bg-slate-100 font-bold text-slate-700">+</button>
-            </div>
-
-            <button onclick="app.addQuickViewToCart()" class="flex-1 w-full py-4 px-6 bg-slate-900 hover:bg-blue-600 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 shadow-xl">
-              <i data-lucide="shopping-bag" class="w-5 h-5"></i>
-              <span>Añadir a la Cesta</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    this.refreshIcons();
-  }
-
-  updateQuickViewQty(delta) {
-    let nextQty = this.quickViewQty + delta;
-    if (nextQty < 1) nextQty = 1;
-    this.quickViewQty = nextQty;
-    const qtyEl = document.getElementById('qv-qty');
-    if (qtyEl) qtyEl.textContent = this.quickViewQty;
-  }
-
-  addQuickViewToCart() {
-    if (!this.quickViewProduct) return;
-    this.addToCart(this.quickViewProduct.id, null, null, this.quickViewQty);
-    this.closeQuickView();
-    this.openCart();
-  }
-
-  // --- CARRITO ---
-  quickAddToCart(productId) {
-    this.addToCart(productId, 'Estándar', 'Estándar', 1);
-  }
-
-  addToCart(productId, size, color, quantity = 1) {
-    const product = this.products.find(p => p.id === productId);
-    if (!product) return;
-
-    const existingIndex = this.cart.findIndex(item => item.productId === productId);
-
-    if (existingIndex > -1) {
-      this.cart[existingIndex].quantity += quantity;
-    } else {
-      this.cart.push({
-        productId,
-        product,
-        size: size || 'Estándar',
-        color: color || 'Estándar',
-        quantity
-      });
-    }
-
-    this.saveToStorage('aura_cart', this.cart);
-    this.updateCartBadge();
-    this.renderCartItems();
-
-    this.showToast('¡Añadido a la Cesta!', `Se agregó "${product.name}" al carrito.`, 'success');
-  }
-
-  updateCartQty(index, delta) {
-    if (!this.cart[index]) return;
-    this.cart[index].quantity += delta;
-    if (this.cart[index].quantity <= 0) {
-      this.removeFromCart(index);
-      return;
-    }
-    this.saveToStorage('aura_cart', this.cart);
-    this.updateCartBadge();
-    this.renderCartItems();
-  }
-
-  removeFromCart(index) {
-    if (!this.cart[index]) return;
-    this.cart.splice(index, 1);
-    this.saveToStorage('aura_cart', this.cart);
-    this.updateCartBadge();
-    this.renderCartItems();
-  }
-
-  updateCartBadge() {
-    const totalItems = this.cart.reduce((sum, item) => sum + item.quantity, 0);
-    const badges = document.querySelectorAll('.cart-count-badge');
-    badges.forEach(b => {
-      b.textContent = totalItems;
-      if (totalItems > 0) b.classList.remove('hidden');
-      else b.classList.add('hidden');
-    });
-  }
-
-  openCart() {
-    const drawer = document.getElementById('cart-drawer');
-    const backdrop = document.getElementById('cart-backdrop');
-    const panel = document.getElementById('cart-panel');
-
-    if (!drawer || !backdrop || !panel) return;
-
-    this.renderCartItems();
-    drawer.classList.remove('hidden');
-    setTimeout(() => {
-      backdrop.classList.remove('opacity-0');
-      backdrop.classList.add('opacity-100');
-      panel.classList.remove('translate-x-full');
-      panel.classList.add('translate-x-0');
-    }, 10);
-    document.body.classList.add('overflow-hidden');
-  }
-
-  closeCart() {
-    const drawer = document.getElementById('cart-drawer');
-    const backdrop = document.getElementById('cart-backdrop');
-    const panel = document.getElementById('cart-panel');
-
-    if (!drawer || !backdrop || !panel) return;
-
-    backdrop.classList.remove('opacity-100');
-    backdrop.classList.add('opacity-0');
-    panel.classList.remove('translate-x-0');
-    panel.classList.add('translate-x-full');
-
-    setTimeout(() => {
-      drawer.classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
-    }, 300);
-  }
-
-  renderCartItems() {
-    const container = document.getElementById('cart-items-container');
-    const subtotalEl = document.getElementById('cart-subtotal');
-    const shippingEl = document.getElementById('cart-shipping');
-    const discountRow = document.getElementById('cart-discount-row');
-    const discountVal = document.getElementById('cart-discount-val');
-    const totalEl = document.getElementById('cart-total');
-    const emptyState = document.getElementById('cart-empty-state');
-    const footerControls = document.getElementById('cart-footer-controls');
-
-    if (!container) return;
-
-    if (this.cart.length === 0) {
-      if (emptyState) emptyState.classList.remove('hidden');
-      if (footerControls) footerControls.classList.add('hidden');
-      container.innerHTML = '';
-      return;
-    }
-
-    if (emptyState) emptyState.classList.add('hidden');
-    if (footerControls) footerControls.classList.remove('hidden');
-
-    let subtotal = 0;
-    container.innerHTML = this.cart.map((item, idx) => {
-      const lineTotal = item.product.price * item.quantity;
-      subtotal += lineTotal;
-
-      return `
-        <div class="flex items-center gap-4 py-4 border-b border-slate-100">
-          <div class="w-16 h-16 bg-slate-50 rounded-2xl p-2 shrink-0 border border-slate-100 flex items-center justify-center">
-            <img src="${item.product.images[0]}" alt="${item.product.name}" class="w-full h-full object-contain mix-blend-multiply" />
-          </div>
-
-          <div class="flex-1 min-w-0">
-            <h4 class="text-xs font-bold text-slate-900 truncate">${item.product.name}</h4>
-            <div class="flex items-center justify-between mt-2">
-              <div class="flex items-center border border-slate-200 rounded-lg bg-white">
-                <button onclick="app.updateCartQty(${idx}, -1)" class="w-6 h-6 text-xs font-bold text-slate-600 hover:bg-slate-100">-</button>
-                <span class="w-6 text-center text-xs font-extrabold text-slate-800">${item.quantity}</span>
-                <button onclick="app.updateCartQty(${idx}, 1)" class="w-6 h-6 text-xs font-bold text-slate-600 hover:bg-slate-100">+</button>
-              </div>
-              <div class="text-right">
-                <div class="text-xs font-black text-slate-900">${this.formatPrice(lineTotal)}</div>
-              </div>
-            </div>
-          </div>
-
-          <button onclick="app.removeFromCart(${idx})" class="text-slate-300 hover:text-rose-500 p-1">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
-        </div>
-      `;
-    }).join('');
-
-    const shipping = subtotal >= 200000 ? 0 : 12000;
-    let discountAmount = 0;
-
-    if (this.appliedCoupon) {
-      discountAmount = (subtotal * this.appliedCoupon.discountPercent) / 100;
-      if (discountRow) discountRow.classList.remove('hidden');
-      if (discountVal) discountVal.textContent = `-${this.formatPrice(discountAmount)}`;
-    } else {
-      if (discountRow) discountRow.classList.add('hidden');
-    }
-
-    const finalTotal = subtotal - discountAmount + shipping;
-
-    if (subtotalEl) subtotalEl.textContent = this.formatPrice(subtotal);
-    if (shippingEl) shippingEl.textContent = shipping === 0 ? 'GRATIS' : this.formatPrice(shipping);
-    if (totalEl) totalEl.textContent = this.formatPrice(finalTotal);
-
-    this.refreshIcons();
-  }
-
-  applyPromoCode() {
-    const input = document.getElementById('coupon-input');
-    if (!input) return;
-    const code = input.value.trim().toUpperCase();
-
-    if (ACTIVE_COUPONS && ACTIVE_COUPONS[code]) {
-      this.appliedCoupon = { code, ...ACTIVE_COUPONS[code] };
-      this.showToast('¡Cupón Aplicado!', `Descuento del ${this.appliedCoupon.discountPercent}% activado.`, 'success');
-      this.renderCartItems();
-    } else {
-      this.showToast('Cupón no válido', 'Prueba con: MAYORISTA o ALUMAXJT', 'error');
-    }
-  }
-
-  // --- FAVORITOS ---
-  toggleWishlist(productId) {
-    const index = this.wishlist.indexOf(productId);
-    const product = this.products.find(p => p.id === productId);
-
-    if (index > -1) {
-      this.wishlist.splice(index, 1);
-    } else {
-      this.wishlist.push(productId);
-    }
-
-    this.saveToStorage('aura_wishlist', this.wishlist);
-    this.updateWishlistBadge();
-    this.renderProducts();
-  }
-
-  updateWishlistBadge() {
-    const count = this.wishlist.length;
-    const badges = document.querySelectorAll('.wishlist-count-badge');
-    badges.forEach(b => {
-      b.textContent = count;
-      if (count > 0) b.classList.remove('hidden');
-      else b.classList.add('hidden');
-    });
-  }
-
-  openWishlistModal() {
-    const modal = document.getElementById('wishlist-modal');
-    const container = document.getElementById('wishlist-items-container');
-    if (!modal || !container) return;
-
-    if (this.wishlist.length === 0) {
-      container.innerHTML = `<div class="py-8 text-center text-xs text-slate-500">No tienes productos en favoritos.</div>`;
-    } else {
-      const favProducts = this.products.filter(p => this.wishlist.includes(p.id));
-      container.innerHTML = favProducts.map(p => `
-        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
-          <div class="flex items-center gap-3">
-            <img src="${p.images[0]}" class="w-12 h-12 object-contain bg-white rounded-xl p-1" />
-            <div>
-              <h5 class="text-xs font-bold text-slate-900">${p.name}</h5>
-              <span class="text-xs font-black text-slate-700">${this.formatPrice(p.price)}</span>
-            </div>
-          </div>
-          <button onclick="app.quickAddToCart('${p.id}'); app.closeWishlistModal(); app.openCart();" class="px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl">Añadir</button>
-        </div>
-      `).join('');
-    }
-
-    modal.classList.remove('hidden');
-    document.body.classList.add('overflow-hidden');
-    this.refreshIcons();
-  }
-
-  closeWishlistModal() {
-    const modal = document.getElementById('wishlist-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
-    }
-  }
-
-  // --- MODAL DE CHECKOUT Y PROCESO DE PAGO ---
-  openCheckoutModal() {
-    if (this.cart.length === 0) {
-      this.showToast('Cesta vacía', 'Añade productos antes de pagar.', 'warning');
-      return;
-    }
-
-    this.closeCart();
-    const modal = document.getElementById('checkout-modal');
-    if (!modal) return;
-
-    this.setCheckoutStep(1);
-
-    const totalAmount = document.getElementById('cart-total') ? document.getElementById('cart-total').textContent : '$ 0';
-    const checkoutTotal = document.getElementById('checkout-summary-total');
-    if (checkoutTotal) checkoutTotal.textContent = totalAmount;
-
-    modal.classList.remove('hidden');
-    document.body.classList.add('overflow-hidden');
-    this.refreshIcons();
-  }
-
-  closeCheckoutModal() {
-    const modal = document.getElementById('checkout-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
-    }
-  }
-
-  setCheckoutStep(stepNumber) {
-    for (let i = 1; i <= 3; i++) {
-      const stepContent = document.getElementById(`checkout-step-${i}`);
-      const stepIndicator = document.getElementById(`step-indicator-${i}`);
-      if (stepContent) {
-        if (i === stepNumber) stepContent.classList.remove('hidden');
-        else stepContent.classList.add('hidden');
-      }
-      if (stepIndicator) {
-        if (i <= stepNumber) {
-          stepIndicator.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
-        } else {
-          stepIndicator.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
-          stepIndicator.classList.add('bg-white', 'text-slate-400', 'border-slate-300');
-        }
-      }
-    }
-  }
-
-  processPaymentOrder() {
-    const selectedGateway = document.querySelector('input[name="payment-gateway"]:checked')?.value || 'wompi';
-    const payBtn = document.getElementById('pay-submit-btn');
-
-    if (payBtn) {
-      payBtn.disabled = true;
-      payBtn.innerHTML = `Conectando con ${selectedGateway.toUpperCase()}...`;
-    }
-
-    setTimeout(() => {
-      this.setCheckoutStep(3);
-      const randomOrder = 'ALX-CO-' + Math.floor(100000 + Math.random() * 900000);
-      const orderIdEl = document.getElementById('confirmed-order-id');
-      if (orderIdEl) orderIdEl.textContent = randomOrder;
-
-      this.launchConfetti();
-
-      this.cart = [];
-      this.appliedCoupon = null;
-      this.saveToStorage('aura_cart', this.cart);
-      this.updateCartBadge();
-      this.renderCartItems();
-
-      this.showToast('¡Pago Procesado!', `Orden ${randomOrder} generada exitosamente.`, 'success');
-      this.refreshIcons();
-    }, 1500);
-  }
-
-  launchConfetti() {
-    if (window.confetti) {
-      window.confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-    }
-  }
-
-  showToast(title, message, type = 'info') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = `toast-item flex items-start gap-3 p-4 bg-white/95 border border-slate-200 rounded-2xl shadow-2xl max-w-sm pointer-events-auto transition-all`;
-    toast.innerHTML = `
-      <div class="flex-1 min-w-0">
-        <h5 class="text-xs font-bold text-slate-900">${title}</h5>
-        <p class="text-xs text-slate-500 mt-0.5">${message}</p>
-      </div>
-    `;
-
-    container.appendChild(toast);
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 400);
-    }, 4000);
-  }
-
-  // --- ADMINISTRACIÓN DE FOTOS Y PRODUCTOS ---
-  openChangeImageModal(productId) {
-    if (!this.isAdmin()) return;
-
-    const product = this.products.find(p => p.id === productId);
-    if (!product) return;
-
-    this.editingProductId = productId;
-    const modal = document.getElementById('change-image-modal');
-    const nameEl = document.getElementById('change-img-prod-name');
-    const inputEl = document.getElementById('change-img-url-input');
-    const previewEl = document.getElementById('change-img-preview');
-
-    if (nameEl) nameEl.textContent = product.name;
-    if (inputEl) inputEl.value = product.images[0] || '';
-    if (previewEl) previewEl.src = product.images[0] || '';
-
-    if (modal) modal.classList.remove('hidden');
-  }
-
-  closeChangeImageModal() {
-    const modal = document.getElementById('change-image-modal');
-    if (modal) modal.classList.add('hidden');
-    this.editingProductId = null;
-  }
-
-  previewImageChange(url) {
-    const previewEl = document.getElementById('change-img-preview');
-    if (previewEl && url.trim()) previewEl.src = url.trim();
-  }
-
-  saveProductImage() {
-    if (!this.editingProductId) return;
-    const inputEl = document.getElementById('change-img-url-input');
-    const newUrl = inputEl ? inputEl.value.trim() : '';
-
-    if (!newUrl) return;
-
-    const product = this.products.find(p => p.id === this.editingProductId);
-    if (product) {
-      product.images[0] = newUrl;
-      this.applyFilters();
-      this.closeChangeImageModal();
-      this.showToast('Foto actualizada', `Imagen de "${product.name}" modificada.`, 'success');
-    }
-  }
-
-  openAddProductModal() {
-    if (!this.isAdmin()) return;
-    const modal = document.getElementById('add-product-modal');
-    if (modal) modal.classList.remove('hidden');
-  }
-
-  closeAddProductModal() {
-    const modal = document.getElementById('add-product-modal');
-    if (modal) modal.classList.add('hidden');
-  }
-
-  saveNewProduct(event) {
-    if (event) event.preventDefault();
-
-    const name = document.getElementById('new-prod-name').value.trim();
-    const category = document.getElementById('new-prod-category').value;
-    const price = parseFloat(document.getElementById('new-prod-price').value) || 0;
-    const provider = document.getElementById('new-prod-provider').value.trim() || 'Alumax JT';
-    const image = document.getElementById('new-prod-image').value.trim() || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80';
-    const description = document.getElementById('new-prod-desc').value.trim() || 'Pieza industrial garantizada.';
-
-    if (!name || price <= 0) return;
-
-    const catObj = CATEGORIES.find(c => c.id === category) || CATEGORIES[0];
-    const newId = `art-custom-${Date.now()}`;
-
-    const newProduct = {
-      id: newId,
-      name,
-      subtitle: `Línea ${catObj.name}`,
-      category,
-      categoryName: catObj.name,
-      price,
-      oldPrice: Math.round(price * 1.15),
-      discount: "-15%",
-      rating: 5.0,
-      reviewsCount: 1,
-      stock: 999,
-      provider,
-      colors: [{ name: "Estándar", hex: "#475569" }],
-      sizes: ["Estándar"],
-      images: [image],
-      description,
-      specs: [`Referencia: ${newId.toUpperCase()}`, `Proveedor: ${provider}`]
-    };
-
-    this.products.unshift(newProduct);
-    PRODUCTS = this.products;
-    this.populateProviderSelect();
-    this.renderCategoryPills();
-    this.applyFilters();
-    this.closeAddProductModal();
-
-    this.showToast('¡Producto Añadido!', `"${name}" publicado con éxito.`, 'success');
-  }
-
-  openAdminModal() {
-    if (!this.isAdmin()) return;
-    const modal = document.getElementById('admin-modal');
-    const totalCountEl = document.getElementById('admin-total-count');
-    if (totalCountEl) totalCountEl.textContent = this.products.length;
-    if (modal) modal.classList.remove('hidden');
-  }
-
-  closeAdminModal() {
-    const modal = document.getElementById('admin-modal');
-    if (modal) modal.classList.add('hidden');
-  }
-
-  exportCatalogFile() {
-    const fileContent = `const BASE_PRODUCTS = ${JSON.stringify(this.products, null, 2)};\nlet PRODUCTS = [...BASE_PRODUCTS];`;
-    const blob = new Blob([fileContent], { type: 'application/javascript;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'products.js';
-    link.click();
-    URL.revokeObjectURL(url);
-    this.showToast('Exportado', 'Archivo products.js generado.', 'success');
-  }
-
-  setupEventListeners() {
-    const sortSelect = document.getElementById('sort-select');
-    if (sortSelect) {
-      sortSelect.addEventListener('change', (e) => this.setSort(e.target.value));
-    }
-
-    // Ocultar desplegables de búsqueda al hacer clic fuera
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.ax-search') && !e.target.closest('.ax-mobile-search')) {
-        this.hideSearchDropdown();
-      }
-    });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        this.closeQuickView();
-        this.closeCart();
-        this.closeWishlistModal();
-        this.closeCheckoutModal();
-        this.closeRegionModal();
-        this.closeChangeImageModal();
-        this.closeAddProductModal();
-        this.closeAdminModal();
-        this.hideSearchDropdown();
-      }
-    });
+  alert(prefix + msg);
+}
+
+// ABRIR / CERRAR MENÚ MÓVIL
+function toggleMobileMenu() {
+  const sidebar = document.getElementById('sidebar-menu');
+  if (sidebar) {
+    sidebar.classList.toggle('-translate-x-full');
   }
 }
 
-let app;
-document.addEventListener('DOMContentLoaded', () => {
-  app = new StoreApp();
-});
+// CÁLCULO DE IVA EN TIEMPO REAL
+function updateVatPreview(priceInputId, vatDisplayId) {
+  const priceVal = parseFloat(document.getElementById(priceInputId).value) || 0;
+  const vatPrice = priceVal * 1.19;
+  const displayElement = document.getElementById(vatDisplayId);
+  if (displayElement) {
+    displayElement.value = vatPrice.toFixed(2);
+  }
+}
+
+// LOGIN Y SESIÓN
+async function handleLogin(e) {
+  e.preventDefault();
+  const usernameInput = document.getElementById("login-username").value.trim();
+  const passwordInput = document.getElementById("login-password").value.trim();
+
+  if (!supabaseClient) return;
+
+  const { data, error } = await supabaseClient.rpc("app_login", {
+    p_username: usernameInput,
+    p_password: passwordInput
+  });
+
+  if (error || !data) {
+    alert("⚠️ Usuario o contraseña incorrectos.");
+    return;
+  }
+
+  currentUser = data;
+  localStorage.setItem("inventory_user", JSON.stringify(currentUser));
+  document.getElementById("login-username").value = "";
+  document.getElementById("login-password").value = "";
+  showAppScreen();
+}
+
+function handleLogout() {
+  if (supabaseClient && currentUser && currentUser.token) {
+    supabaseClient.rpc("app_logout", { p_token: currentUser.token }).then(() => {}, () => {});
+  }
+  localStorage.removeItem("inventory_user");
+  currentUser = null;
+  document.getElementById("app-screen").classList.add("hidden");
+  document.getElementById("login-screen").classList.remove("hidden");
+}
+
+async function showAppScreen() {
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("app-screen").classList.remove("hidden");
+
+  document.getElementById("user-display-name").innerText = `@${currentUser.username}`;
+  document.getElementById("user-display-role").innerText = currentUser.role;
+
+  applyRolePermissions();
+  await fetchProducts();
+  await fetchMovements();
+  await fetchRequests();
+
+  if (currentUser.role === 'admin' || currentUser.role === 'operator') {
+    await fetchDistributors();
+  }
+
+  if (currentUser.role === 'admin') {
+    await fetchUsers();
+  }
+
+  subscribeRealtime();
+}
+
+function applyRolePermissions() {
+  const btnMovement = document.getElementById("btn-new-movement");
+  const navUsers = document.getElementById("nav-users");
+  const navDistributors = document.getElementById("nav-distributors");
+  const btnAddProduct = document.getElementById("btn-add-product");
+  const btnAddDist = document.getElementById("btn-add-distributor");
+
+  if (currentUser.role === "admin" || currentUser.role === "operator") {
+    if (navDistributors) navDistributors.classList.remove("hidden");
+  } else {
+    if (navDistributors) navDistributors.classList.add("hidden");
+  }
+
+  if (currentUser.role === "admin") {
+    if (btnAddDist) btnAddDist.classList.remove("hidden");
+  } else {
+    if (btnAddDist) btnAddDist.classList.add("hidden");
+  }
+
+  if (currentUser.role === "viewer") {
+    if (btnMovement) btnMovement.classList.add("hidden");
+  } else {
+    if (btnMovement) btnMovement.classList.remove("hidden");
+  }
+
+  if (currentUser.role === "admin") {
+    if (navUsers) navUsers.classList.remove("hidden");
+    if (btnAddProduct) btnAddProduct.classList.remove("hidden");
+  } else {
+    if (navUsers) navUsers.classList.add("hidden");
+    if (btnAddProduct) btnAddProduct.classList.add("hidden");
+  }
+}
+
+// CAMBIO DE CONTRASEÑA
+function openChangePasswordModal() {
+  document.getElementById("pass-current").value = "";
+  document.getElementById("pass-new").value = "";
+  document.getElementById("pass-confirm").value = "";
+  document.getElementById("change-password-modal").classList.remove("hidden");
+}
+
+function closeChangePasswordModal() {
+  document.getElementById("change-password-modal").classList.add("hidden");
+}
+
+async function saveNewPassword() {
+  const currentPass = document.getElementById("pass-current").value.trim();
+  const newPass = document.getElementById("pass-new").value.trim();
+  const confirmPass = document.getElementById("pass-confirm").value.trim();
+
+  if (!currentPass) {
+    alert("⚠️ Escribe tu contraseña actual.");
+    return;
+  }
+
+  if (newPass.length < 6) {
+    alert("⚠️ La nueva contraseña debe tener al menos 6 caracteres.");
+    return;
+  }
+
+  if (newPass !== confirmPass) {
+    alert("⚠️ Las nuevas contraseñas no coinciden.");
+    return;
+  }
+
+  const { error } = await supabaseClient.rpc("app_change_password", {
+    p_token: currentUser.token,
+    p_current: currentPass,
+    p_new: newPass
+  });
+
+  if (error) {
+    handleRpcError(error, "⚠️ ");
+    return;
+  }
+
+  alert("✅ ¡Contraseña actualizada con éxito!");
+  closeChangePasswordModal();
+}
+
+// REALTIME
+function subscribeRealtime() {
+  if (!supabaseClient) return;
+  supabaseClient
+    .channel("public:inventory")
+    .on("postgres_changes", { event: "*", schema: "public", table: "products" }, async () => {
+      await fetchProducts();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "movements" }, async () => {
+      await fetchMovements();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "distributors" }, async () => {
+      if (currentUser.role === 'admin' || currentUser.role === 'operator') {
+        await fetchDistributors();
+      }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, async () => {
+      await fetchRequests();
+    })
+    .subscribe();
+}
+
+// OBTENER DATOS
+async function fetchProducts() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from("products").select("*").order("id", { ascending: true });
+  if (!error && data) {
+    products = data.map(p => ({
+      ...p,
+      // Si el campo viene como PRODUCTOS o productos lo asigna a name automáticamente
+      name: p.name || p.PRODUCTOS || p.productos || ''
+    }));
+    renderDashboard();
+    renderProducts();
+  }
+}
+
+async function fetchMovements() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from("movements").select("*").order("created_at", { ascending: false });
+  if (!error && data) {
+    movements = data;
+    renderMovements();
+    renderChart();
+  }
+}
+
+async function fetchUsers() {
+  if (!supabaseClient) return;
+  if (!currentUser || currentUser.role !== 'admin') return;
+  const { data, error } = await supabaseClient.rpc("app_list_users", { p_token: currentUser.token });
+  if (error) {
+    handleRpcError(error, "Error al cargar usuarios: ");
+    return;
+  }
+  if (data) {
+    systemUsers = data;
+    renderUsers();
+  }
+}
+
+// CAMBIAR ROL DE USUARIO
+async function changeUserRole(userId, newRole) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  const targetUser = systemUsers.find(u => u.id === userId);
+  if (!targetUser) return;
+
+  if (targetUser.role === 'admin') {
+    alert("⚠️ No se puede modificar el rol del administrador principal.");
+    await fetchUsers();
+    return;
+  }
+
+  const { error } = await supabaseClient.rpc("app_set_role", {
+    p_token: currentUser.token,
+    p_id: userId,
+    p_role: newRole
+  });
+
+  if (error) {
+    handleRpcError(error, "Error al cambiar el rol: ");
+    await fetchUsers();
+    return;
+  }
+
+  alert(`✅ Rol de @${targetUser.username} cambiado a ${newRole.toUpperCase()}.`);
+  await fetchUsers();
+}
+
+function renderUsers() {
+  const tbody = document.getElementById("users-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  systemUsers.forEach(u => {
+    const isAdmin = u.role === 'admin';
+
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition">
+        <td class="p-4 font-bold text-white">@${u.username}</td>
+        <td class="p-4">
+          ${isAdmin ? `
+            <span class="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+              ADMIN
+            </span>
+          ` : `
+            <select onchange="changeUserRole(${u.id}, this.value)" class="bg-slate-900 border border-slate-700 text-xs text-amber-400 font-bold rounded-lg px-2.5 py-1 focus:outline-none focus:border-amber-500 cursor-pointer">
+              <option value="operator" ${u.role === 'operator' ? 'selected' : ''}>👷 OPERATOR</option>
+              <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>👁️ VIEWER</option>
+            </select>
+          `}
+        </td>
+        <td class="p-4 text-xs text-slate-400">${new Date(u.created_at).toLocaleDateString()}</td>
+        <td class="p-4">
+          ${!isAdmin ? `<button onclick="deleteUser(${u.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash mr-1"></i> Eliminar</button>` : '<span class="text-xs text-slate-600">Principal</span>'}
+        </td>
+      </tr>
+    `;
+  });
+}
+
+async function handleCreateUser(e) {
+  e.preventDefault();
+  if (currentUser.role !== 'admin') return;
+
+  const username = document.getElementById("new-username").value.trim();
+  const password = document.getElementById("new-password").value.trim();
+  const role = document.getElementById("new-role").value;
+
+  if (password.length < 6) {
+    alert("⚠️ La contraseña debe tener al menos 6 caracteres.");
+    return;
+  }
+
+  const { error } = await supabaseClient.rpc("app_create_user", {
+    p_token: currentUser.token,
+    p_username: username,
+    p_password: password,
+    p_role: role
+  });
+
+  if (error) {
+    handleRpcError(error, "Error al crear usuario: ");
+    return;
+  }
+
+  alert(`✅ Usuario @${username} creado con éxito.`);
+  document.getElementById("new-username").value = "";
+  document.getElementById("new-password").value = "";
+  await fetchUsers();
+}
+
+async function deleteUser(userId) {
+  if (currentUser.role !== 'admin') return;
+  if (!confirm("¿Seguro que deseas eliminar este usuario?")) return;
+
+  const { error } = await supabaseClient.rpc("app_delete_user", {
+    p_token: currentUser.token,
+    p_id: userId
+  });
+  if (error) {
+    handleRpcError(error, "Error al eliminar el usuario: ");
+    return;
+  }
+  await fetchUsers();
+}
+
+// CONTACTOS / DISTRIBUIDORES
+async function fetchDistributors() {
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from("distributors").select("*").order("id", { ascending: true });
+  if (!error && data) {
+    distributors = data;
+    renderDistributors();
+  }
+}
+
+function applyDistributorFilters() {
+  const query = document.getElementById("dist-filter-search").value.toLowerCase().trim();
+  const categoryFilter = document.getElementById("dist-filter-category").value;
+  const municipalityFilter = document.getElementById("dist-filter-municipality").value.toLowerCase().trim();
+
+  const filtered = distributors.filter(d => {
+    const matchesQuery = !query || 
+      (d.name && d.name.toLowerCase().includes(query)) || 
+      (d.phone && d.phone.toLowerCase().includes(query)) ||
+      (d.email && d.email.toLowerCase().includes(query)) ||
+      (d.notes && d.notes.toLowerCase().includes(query));
+
+    const matchesCategory = (categoryFilter === 'ALL') || (d.category === categoryFilter);
+    const matchesMunicipality = !municipalityFilter || (d.municipality && d.municipality.toLowerCase().includes(municipalityFilter));
+
+    return matchesQuery && matchesCategory && matchesMunicipality;
+  });
+
+  renderDistributors(filtered);
+}
+
+function renderDistributors(customList = null) {
+  const list = customList || distributors;
+  const tbody = document.getElementById("distributors-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No se encontraron contactos.</td></tr>`;
+    return;
+  }
+
+  list.forEach(d => {
+    let catClass = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    if (d.category === 'ENVÍOS') catClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    if (d.category === 'CONTADURÍA') catClass = 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
+
+    const cleanPhone = d.phone ? d.phone.replace(/[^0-9]/g, '') : '';
+
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
+        <td class="p-4">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold border ${catClass}">
+            ${d.category || 'PROVEEDORES'}
+          </span>
+        </td>
+        <td class="p-4 font-bold text-white">${d.name}</td>
+        <td class="p-4 font-mono text-xs">
+          ${d.phone ? `
+            <div class="flex items-center gap-2">
+              <span class="text-amber-400 font-semibold">${d.phone}</span>
+              <a href="https://wa.me/${cleanPhone}" target="_blank" title="Abrir WhatsApp" class="text-emerald-400 hover:text-emerald-300">
+                <i class="fa-brands fa-whatsapp text-sm"></i>
+              </a>
+            </div>
+          ` : '<span class="text-slate-600">-</span>'}
+        </td>
+        <td class="p-4 text-slate-300">${d.municipality || '-'}</td>
+        <td class="p-4 text-xs text-slate-400">${d.notes || d.email || '-'}</td>
+        <td class="p-4 flex gap-3">
+          ${isAdmin ? `
+            <button onclick="openEditDistributorModal(${d.id})" class="text-amber-400 hover:text-amber-300 text-xs font-semibold"><i class="fa-solid fa-pen"></i> Editar</button>
+            <button onclick="deleteDistributor(${d.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash"></i> Eliminar</button>
+          ` : '<span class="text-xs text-slate-600">Solo lectura</span>'}
+        </td>
+      </tr>
+    `;
+  });
+}
+
+function openAddDistributorModal() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  document.getElementById("dist-modal-title").innerText = "Añadir Contacto";
+  document.getElementById("dist-id").value = "";
+  document.getElementById("dist-category").value = "PROVEEDORES";
+  document.getElementById("dist-name").value = "";
+  document.getElementById("dist-phone").value = "";
+  document.getElementById("dist-municipality").value = "";
+  document.getElementById("dist-notes").value = "";
+
+  document.getElementById("distributor-modal").classList.remove("hidden");
+}
+
+function openEditDistributorModal(distId) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  const d = distributors.find(item => item.id === distId);
+  if (!d) return;
+
+  document.getElementById("dist-modal-title").innerText = "Editar Contacto";
+  document.getElementById("dist-id").value = d.id;
+  document.getElementById("dist-category").value = d.category || "PROVEEDORES";
+  document.getElementById("dist-name").value = d.name;
+  document.getElementById("dist-phone").value = d.phone || "";
+  document.getElementById("dist-municipality").value = d.municipality || "";
+  document.getElementById("dist-notes").value = d.notes || d.email || "";
+
+  document.getElementById("distributor-modal").classList.remove("hidden");
+}
+
+function closeDistributorModal() {
+  document.getElementById("distributor-modal").classList.add("hidden");
+}
+
+async function saveDistributor() {
+  if (!supabaseClient || currentUser.role !== 'admin') return;
+
+  const id = document.getElementById("dist-id").value;
+  const category = document.getElementById("dist-category").value;
+  const name = document.getElementById("dist-name").value.trim();
+  const phone = document.getElementById("dist-phone").value.trim();
+  const municipality = document.getElementById("dist-municipality").value.trim();
+  const notes = document.getElementById("dist-notes").value.trim();
+
+  if (!name) {
+    alert("⚠️ El nombre del contacto es obligatorio.");
+    return;
+  }
+
+  if (id) {
+    const { error } = await supabaseClient
+      .from("distributors")
+      .update({ category, name, phone, municipality, notes })
+      .eq("id", parseInt(id));
+
+    if (error) {
+      alert("Error al actualizar contacto: " + error.message);
+      return;
+    }
+  } else {
+    const { error } = await supabaseClient
+      .from("distributors")
+      .insert([{ category, name, phone, municipality, notes }]);
+
+    if (error) {
+      alert("Error al guardar contacto: " + error.message);
+      return;
+    }
+  }
+
+  closeDistributorModal();
+  await fetchDistributors();
+}
+
+async function deleteDistributor(distId) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  if (!confirm("¿Seguro que deseas eliminar este contacto?")) return;
+
+  const { error } = await supabaseClient.from("distributors").delete().eq("id", distId);
+  if (error) {
+    alert("Error al eliminar contacto: " + error.message);
+    return;
+  }
+
+  await fetchDistributors();
+}
+
+// DESPLEGABLES CON BUSCADOR EN TARJETAS
+function filterUnitsProducts(showAll = false) {
+  const input = document.getElementById("select-units-filter-search");
+  const resultsDiv = document.getElementById("select-units-filter-results");
+  const query = showAll ? "" : input.value.toLowerCase().trim();
+
+  let html = `
+    <div onclick="selectUnitsProduct('all', '📦 Todas las unidades (Total)')" class="p-2.5 text-xs text-slate-200 hover:bg-indigo-600 hover:text-white cursor-pointer transition">
+      📦 Todas las unidades (Total)
+    </div>
+  `;
+
+  const filtered = query ? products.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  ) : products;
+
+  filtered.forEach(p => {
+    html += `
+      <div onclick="selectUnitsProduct(${p.id}, '${p.code ? p.code + ' - ' : ''}${p.name.replace(/'/g, "\\'")}')" class="p-2.5 text-xs text-slate-200 hover:bg-indigo-600 hover:text-white cursor-pointer transition truncate">
+        ${p.code ? '<strong>' + p.code + '</strong> - ' : ''}${p.name}
+      </div>
+    `;
+  });
+
+  resultsDiv.innerHTML = html;
+  resultsDiv.classList.remove("hidden");
+}
+
+function selectUnitsProduct(id, label) {
+  document.getElementById("select-units-filter-search").value = label;
+  document.getElementById("select-units-filter-id").value = id;
+  document.getElementById("select-units-filter-results").classList.add("hidden");
+  updateProductUnitsFilter();
+}
+
+function updateProductUnitsFilter() {
+  const selectedId = document.getElementById('select-units-filter-id').value;
+  const statUnits = document.getElementById('stat-total-units');
+
+  if (selectedId === 'all') {
+    const totalUnits = products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
+    statUnits.innerText = totalUnits.toLocaleString();
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) {
+      statUnits.innerText = (Number(p.stock) || 0).toLocaleString();
+    }
+  }
+}
+
+function filterValuationProducts(showAll = false) {
+  const input = document.getElementById("select-product-filter-search");
+  const resultsDiv = document.getElementById("select-product-filter-results");
+  const query = showAll ? "" : input.value.toLowerCase().trim();
+
+  let html = `
+    <div onclick="selectValuationProduct('all', '📦 Todos los productos (Total)')" class="p-2.5 text-xs text-slate-200 hover:bg-emerald-600 hover:text-white cursor-pointer transition">
+      📦 Todos los productos (Total)
+    </div>
+  `;
+
+  const filtered = query ? products.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  ) : products;
+
+  filtered.forEach(p => {
+    html += `
+      <div onclick="selectValuationProduct(${p.id}, '${p.code ? p.code + ' - ' : ''}${p.name.replace(/'/g, "\\'")}')" class="p-2.5 text-xs text-slate-200 hover:bg-emerald-600 hover:text-white cursor-pointer transition truncate">
+        ${p.code ? '<strong>' + p.code + '</strong> - ' : ''}${p.name}
+      </div>
+    `;
+  });
+
+  resultsDiv.innerHTML = html;
+  resultsDiv.classList.remove("hidden");
+}
+
+function selectValuationProduct(id, label) {
+  document.getElementById("select-product-filter-search").value = label;
+  document.getElementById("select-product-filter-id").value = id;
+  document.getElementById("select-product-filter-results").classList.add("hidden");
+  updateProductValueFilter();
+}
+
+function filterLowStockProducts(showAll = false) {
+  const input = document.getElementById("select-low-stock-filter-search");
+  const resultsDiv = document.getElementById("select-low-stock-filter-results");
+  const query = showAll ? "" : input.value.toLowerCase().trim();
+  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 5));
+
+  let html = `
+    <div onclick="selectLowStockProduct('all', '⚠️ Mostrar todos los críticos (${lowStockItems.length})')" class="p-2.5 text-xs text-slate-200 hover:bg-rose-600 hover:text-white cursor-pointer transition">
+      ⚠️ Mostrar todos los críticos (${lowStockItems.length})
+    </div>
+  `;
+
+  const filtered = query ? lowStockItems.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  ) : lowStockItems;
+
+  filtered.forEach(p => {
+    html += `
+      <div onclick="selectLowStockProduct(${p.id}, '${p.name.replace(/'/g, "\\'")} (${p.stock} un.)')" class="p-2.5 text-xs text-slate-200 hover:bg-rose-600 hover:text-white cursor-pointer transition truncate">
+        ${p.name} <span class="font-bold text-rose-400">(${p.stock} un.)</span>
+      </div>
+    `;
+  });
+
+  resultsDiv.innerHTML = html;
+  resultsDiv.classList.remove("hidden");
+}
+
+function selectLowStockProduct(id, label) {
+  document.getElementById("select-low-stock-filter-search").value = label;
+  document.getElementById("select-low-stock-filter-id").value = id;
+  document.getElementById("select-low-stock-filter-results").classList.add("hidden");
+  previewLowStockItem();
+}
+
+function previewLowStockItem() {
+  const selectedId = document.getElementById('select-low-stock-filter-id').value;
+  const statLowStock = document.getElementById('stat-low-stock');
+
+  if (selectedId === 'all') {
+    const totalLow = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 5)).length;
+    statLowStock.innerText = totalLow;
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) {
+      statLowStock.innerText = `${p.stock} un.`;
+    }
+  }
+}
+
+function updateProductValueFilter() {
+  const selectedId = document.getElementById('select-product-filter-id').value;
+  const chartTitle = document.getElementById('chart-title');
+
+  let displayValue = 0;
+
+  if (selectedId === 'all') {
+    displayValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
+    if (chartTitle) chartTitle.innerText = "Evolución del Valor del Inventario (Total)";
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) {
+      displayValue = (Number(p.stock) || 0) * (Number(p.purchase_price) || 0);
+      if (chartTitle) chartTitle.innerText = `Evolución del Valor: ${p.name}`;
+    }
+  }
+
+  document.getElementById('stat-total-value').innerText = "$" + displayValue.toLocaleString();
+  renderChart();
+}
+
+// HISTORIAL Y FILTROS
+function applyMovementFilters() {
+  const query = document.getElementById("mov-filter-search").value.toLowerCase().trim();
+  const typeFilter = document.getElementById("mov-filter-type").value;
+  const startDate = document.getElementById("mov-filter-date-start").value;
+  const endDate = document.getElementById("mov-filter-date-end").value;
+
+  const filtered = movements.filter(m => {
+    const matchesQuery = !query || 
+      (m.product_name && m.product_name.toLowerCase().includes(query)) || 
+      (m.user_role && m.user_role.toLowerCase().includes(query)) ||
+      (m.comment && m.comment.toLowerCase().includes(query));
+
+    const matchesType = (typeFilter === 'ALL') || (m.type === typeFilter);
+
+    const mDate = new Date(m.created_at).toISOString().split('T')[0];
+    const matchesStartDate = !startDate || (mDate >= startDate);
+    const matchesEndDate = !endDate || (mDate <= endDate);
+
+    return matchesQuery && matchesType && matchesStartDate && matchesEndDate;
+  });
+
+  renderMovements(filtered);
+}
+
+function renderMovements(customList = null) {
+  const list = customList || movements;
+  const tbody = document.getElementById('movements-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No se encontraron movimientos.</td></tr>`;
+    return;
+  }
+
+  list.forEach(m => {
+    const formattedDate = new Date(m.created_at).toLocaleString();
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
+        <td class="p-4 text-xs text-slate-400">${formattedDate}</td>
+        <td class="p-4">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${m.type === 'IN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+            ${m.type === 'IN' ? 'ENTRADA (+)' : 'SALIDA (-)'}
+          </span>
+        </td>
+        <td class="p-4 font-medium text-white">${m.product_name}</td>
+        <td class="p-4 font-bold">${m.qty}</td>
+        <td class="p-4 text-slate-300 italic">${m.comment}</td>
+        <td class="p-4 text-xs text-indigo-400 font-semibold">${m.user_role}</td>
+        <td class="p-4">
+          ${isAdmin ? `<button onclick="deleteMovement(${m.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold"><i class="fa-solid fa-trash mr-1"></i> Borrar</button>` : '<span class="text-xs text-slate-600">-</span>'}
+        </td>
+      </tr>
+    `;
+  });
+}
+
+// PETICIONES Y SUGERENCIAS
+async function fetchRequests() {
+  if (!supabaseClient) return;
+  let query = supabaseClient.from("requests").select("*").order("created_at", { ascending: false });
+
+  if (currentUser && currentUser.role !== 'admin') {
+    query = query.eq("username", currentUser.username);
+  }
+
+  const { data, error } = await query;
+  if (!error && data) {
+    appRequests = data;
+    renderRequests();
+  }
+}
+
+function filterRequestsList() {
+  const query = document.getElementById("search-requests-input").value.toLowerCase().trim();
+  const filtered = appRequests.filter(r => 
+    (r.request_text && r.request_text.toLowerCase().includes(query)) ||
+    (r.username && r.username.toLowerCase().includes(query)) ||
+    (r.status && r.status.toLowerCase().includes(query))
+  );
+  renderRequests(filtered);
+}
+
+async function handleSendRequest(e) {
+  e.preventDefault();
+  const requestInput = document.getElementById("request-input");
+  const text = requestInput.value.trim();
+
+  if (!text) return;
+
+  const { error } = await supabaseClient.from("requests").insert([
+    {
+      username: currentUser.username,
+      request_text: text,
+      status: "En proceso"
+    }
+  ]);
+
+  if (error) {
+    alert("Error al enviar petición: " + error.message);
+    return;
+  }
+
+  alert("✅ Petición enviada correctamente.");
+  requestInput.value = "";
+  await fetchRequests();
+}
+
+async function toggleRequestStatus(requestId, currentStatus) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  const newStatus = currentStatus === 'Hecha' ? 'En proceso' : 'Hecha';
+
+  const { error } = await supabaseClient
+    .from("requests")
+    .update({ status: newStatus })
+    .eq("id", requestId);
+
+  if (error) {
+    alert("Error al actualizar el estado: " + error.message);
+    return;
+  }
+
+  await fetchRequests();
+}
+
+async function deleteRequest(requestId) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  if (!confirm("¿Seguro que deseas eliminar esta petición?")) return;
+
+  const { error } = await supabaseClient
+    .from("requests")
+    .delete()
+    .eq("id", requestId);
+
+  if (error) {
+    alert("Error al eliminar petición: " + error.message);
+    return;
+  }
+
+  await fetchRequests();
+}
+
+function renderRequests(customList = null) {
+  const list = customList || appRequests;
+  const tbody = document.getElementById("requests-table-body");
+  const title = document.getElementById("requests-list-title");
+  if (!tbody) return;
+
+  tbody.innerHTML = "";
+
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  if (title) {
+    title.innerText = isAdmin ? "Todas las Peticiones de los Usuarios" : "Mis Peticiones Enviadas";
+  }
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No se encontraron peticiones.</td></tr>`;
+    return;
+  }
+
+  list.forEach(req => {
+    const isDone = req.status === 'Hecha';
+    const dateStr = new Date(req.created_at).toLocaleDateString();
+
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
+        <td class="p-4 text-xs text-slate-400">${dateStr}</td>
+        <td class="p-4 font-bold text-white">@${req.username}</td>
+        <td class="p-4 text-slate-200">${req.request_text}</td>
+        <td class="p-4">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${isDone ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}">
+            ${isDone ? '✅ Hecha' : '⏳ En proceso'}
+          </span>
+        </td>
+        <td class="p-4 flex gap-2">
+          ${isAdmin ? `
+            <button onclick="toggleRequestStatus(${req.id}, '${req.status}')" class="px-3 py-1 rounded-lg text-xs font-semibold ${isDone ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}">
+              ${isDone ? 'Marcar En proceso' : 'Marcar Hecha'}
+            </button>
+            <button onclick="deleteRequest(${req.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold p-1">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          ` : '<span class="text-xs text-slate-600">-</span>'}
+        </td>
+      </tr>
+    `;
+  });
+}
+
+// MODAL STOCK BAJO
+function openLowStockModal() {
+  const modal = document.getElementById('low-stock-modal');
+  const tbody = document.getElementById('low-stock-modal-body');
+  if (!modal || !tbody) return;
+
+  const lowStockItems = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 5));
+
+  tbody.innerHTML = '';
+
+  if (lowStockItems.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No hay productos en estado crítico.</td></tr>`;
+  } else {
+    const isAdmin = currentUser && currentUser.role === 'admin';
+
+    lowStockItems.forEach(p => {
+      tbody.innerHTML += `
+        <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
+          <td class="p-3 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
+          <td class="p-3 font-medium text-white">${p.name}</td>
+          <td class="p-3 text-rose-400 font-bold">${p.stock} un.</td>
+          <td class="p-3 text-slate-400">${p.min_stock || 5} un.</td>
+          <td class="p-3">
+            ${isAdmin ? `<button onclick="closeLowStockModal(); openMovementModalWithProduct(${p.id});" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-lg text-xs font-semibold">Reponer</button>` : '<span class="text-xs text-slate-600">-</span>'}
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeLowStockModal() {
+  document.getElementById('low-stock-modal').classList.add('hidden');
+}
+
+// ELIMINAR REGISTRO DE HISTORIAL
+async function deleteMovement(movementId) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  if (!confirm("¿Seguro que deseas eliminar este registro del historial?")) {
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('movements')
+    .delete()
+    .eq('id', movementId);
+
+  if (error) {
+    alert("Error al borrar el registro del historial: " + error.message);
+    return;
+  }
+
+  await fetchMovements();
+}
+
+// NAVEGACIÓN TAB
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  const targetTab = document.getElementById(`tab-${tabName}`);
+  if (targetTab) targetTab.classList.remove('hidden');
+
+  document.querySelectorAll('nav button').forEach(el => el.classList.remove('active-nav'));
+  const targetNav = document.getElementById(`nav-${tabName}`);
+  if (targetNav) targetNav.classList.add('active-nav');
+
+  // Título y subtítulo según la pestaña
+  const heads = {
+    dashboard: ['Panel principal', 'Estado general y movimientos en tiempo real'],
+    inventory: ['Productos', 'Stock, precios y ediciones'],
+    movements: ['Historial', 'Entradas y salidas registradas'],
+    distributors: ['Contactos', 'Proveedores, envíos y contaduría'],
+    requests: ['Peticiones', 'Solicitudes y sugerencias del equipo'],
+    users: ['Usuarios', 'Accesos y permisos']
+  };
+  if (heads[tabName]) {
+    const t = document.getElementById('page-title');
+    const st = document.getElementById('page-subtitle');
+    if (t) t.innerText = heads[tabName][0];
+    if (st) st.innerText = heads[tabName][1];
+  }
+
+  // Cerrar el menú si estamos en un teléfono
+  const sidebar = document.getElementById('sidebar-menu');
+  if (sidebar && window.innerWidth < 768) {
+    sidebar.classList.add('-translate-x-full');
+  }
+}
+
+function renderDashboard() {
+  const totalProducts = products.length;
+  const lowStock = products.filter(p => (Number(p.stock) || 0) <= (Number(p.min_stock) || 5)).length;
+
+  document.getElementById('stat-total-products').innerText = totalProducts;
+  document.getElementById('stat-low-stock').innerText = lowStock;
+  document.getElementById('total-count-badge').innerText = totalProducts;
+
+  updateProductUnitsFilter();
+  updateProductValueFilter();
+  previewLowStockItem();
+}
+
+// RENDER DEL GRÁFICO DE EVOLUCIÓN
+function renderChart() {
+  const canvas = document.getElementById('valueTrendChart');
+  if (!canvas) return;
+
+  const selectedId = document.getElementById('select-product-filter-id') ? document.getElementById('select-product-filter-id').value : 'all';
+
+  let currentValue = 0;
+  if (selectedId === 'all') {
+    currentValue = products.reduce((acc, p) => acc + ((Number(p.stock) || 0) * (Number(p.purchase_price) || 0)), 0);
+  } else {
+    const p = products.find(prod => prod.id === parseInt(selectedId));
+    if (p) currentValue = (Number(p.stock) || 0) * (Number(p.purchase_price) || 0);
+  }
+
+  const now = new Date();
+  const labels = ["Hoy (" + now.toLocaleDateString() + ")"];
+  const values = [currentValue];
+
+  for (let i = 1; i <= 4; i++) {
+    const futureDate = new Date();
+    futureDate.setDate(now.getDate() + (i * 7));
+    labels.push("Semana " + i + " (" + futureDate.toLocaleDateString() + ")");
+    values.push(currentValue);
+  }
+
+  if (trendChart) {
+    trendChart.destroy();
+  }
+
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+  gradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+  gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Valor ($)',
+        data: values,
+        borderColor: '#10b981',
+        borderWidth: 3,
+        fill: true,
+        backgroundColor: gradient,
+        tension: 0.4,
+        pointBackgroundColor: '#10b981',
+        pointRadius: 5,
+        pointHoverRadius: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ' Valor: $' + context.raw.toLocaleString();
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#94a3b8', font: { size: 11 } }
+        },
+        y: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: {
+            color: '#94a3b8',
+            font: { size: 11 },
+            callback: function(val) {
+              return '$' + val.toLocaleString();
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// RENDER TABLA PRODUCTOS (Resistente a errores)
+// RENDER TABLA PRODUCTOS
+function renderProducts(filteredList = null) {
+  const list = filteredList || products;
+  const tbody = document.getElementById('inventory-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No se encontraron productos.</td></tr>`;
+    return;
+  }
+
+  list.forEach(p => {
+    const stock = Number(p.stock) || 0;
+    const minStock = Number(p.min_stock) || 5;
+    const canMove = currentUser && (currentUser.role === 'admin' || currentUser.role === 'operator');
+    const isAdmin = currentUser && currentUser.role === 'admin';
+
+    const salePrice = Number(p.sale_price) || 0;
+    const salePriceVat = salePrice * 1.19;
+
+    tbody.innerHTML += `
+      <tr class="hover:bg-slate-900 transition border-b border-slate-800/50">
+        <td class="p-4 font-mono text-indigo-400 font-semibold">${p.code || ''}</td>
+        <!-- Nombre tomado directamente del campo name / PRODUCTOS de la BD -->
+        <td class="p-4 font-medium text-white">${p.name || ''}</td>
+        <td class="p-4">
+          <span class="px-2.5 py-1 rounded-full text-xs font-bold ${stock <= minStock ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+            ${stock} unidades
+          </span>
+        </td>
+        <td class="p-4">$${Number(p.purchase_price || 0).toLocaleString()}</td>
+        <td class="p-4 font-semibold text-amber-400">$${salePrice.toLocaleString()}</td>
+        <td class="p-4 font-bold text-emerald-400">$${salePriceVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td class="p-4 flex gap-3">
+          ${canMove ? `<button onclick="openMovementModalWithProduct(${p.id})" class="text-indigo-400 hover:text-indigo-300 text-xs font-semibold">Mover Stock</button>` : ''}
+          ${isAdmin ? `<button onclick="openEditProductModal(${p.id})" class="text-amber-400 hover:text-amber-300 text-xs font-semibold"><i class="fa-solid fa-pen"></i> Editar</button>` : ''}
+          ${!canMove && !isAdmin ? '<span class="text-xs text-slate-600">Solo lectura</span>' : ''}
+        </td>
+      </tr>
+    `;
+  });
+}
+
+function filterProducts() {
+  const query = document.getElementById('search-input').value.toLowerCase();
+  const filtered = products.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  );
+  renderProducts(filtered);
+}
+
+// CREAR NUEVO PRODUCTO
+function openAddProductModal() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  
+  const nextNumber = products.length + 1;
+  const suggestedCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
+  
+  document.getElementById('add-product-code').value = suggestedCode;
+  document.getElementById('add-product-name').value = '';
+  document.getElementById('add-product-stock').value = 0;
+  document.getElementById('add-purchase-price').value = 0;
+  document.getElementById('add-sale-price').value = 0;
+  document.getElementById('add-sale-price-vat').value = '0.00';
+
+  document.getElementById('add-product-modal').classList.remove('hidden');
+}
+
+function closeAddProductModal() {
+  document.getElementById('add-product-modal').classList.add('hidden');
+}
+
+async function saveNewProduct() {
+  if (!supabaseClient || currentUser.role !== 'admin') return;
+
+  const code = document.getElementById('add-product-code').value.trim();
+  const name = document.getElementById('add-product-name').value.trim();
+  const stock = parseInt(document.getElementById('add-product-stock').value) || 0;
+  const purchasePrice = parseFloat(document.getElementById('add-purchase-price').value) || 0;
+  const salePrice = parseFloat(document.getElementById('add-sale-price').value) || 0;
+  
+  // Fórmula automática: Precio Venta * 1.19
+  const salePriceVat = Number((salePrice * 1.19).toFixed(2));
+
+  if (!name) {
+    alert("⚠️ Debes asignar un nombre al nuevo producto.");
+    return;
+  }
+
+  const newId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+
+  const { error } = await supabaseClient.from('products').insert([
+    {
+      id: newId,
+      code: code || `PROD-${newId}`,
+      name: name,
+      category: 'General',
+      stock: stock,
+      min_stock: 5,
+      purchase_price: purchasePrice,
+      sale_price: salePrice,
+      sale_price_vat: salePriceVat
+    }
+  ]);
+
+  if (error) {
+    alert("Error al guardar el nuevo producto: " + error.message);
+    return;
+  }
+
+  if (stock > 0) {
+    await supabaseClient.from('movements').insert([
+      {
+        type: 'IN',
+        product_name: name,
+        qty: stock,
+        comment: 'Alta inicial de nuevo producto',
+        user_role: currentUser.username.toUpperCase()
+      }
+    ]);
+  }
+
+  closeAddProductModal();
+  await fetchProducts();
+}
+
+// EDICIÓN DE PRODUCTO EXISTENTE
+function openEditProductModal(productId) {
+  if (!currentUser || currentUser.role !== 'admin') return;
+
+  const product = products.find(p => p.id === productId);
+  if (!product) return;
+
+  const salePrice = Number(product.sale_price || 0);
+  const salePriceVat = salePrice * 1.19;
+
+  document.getElementById('edit-product-id').value = product.id;
+  document.getElementById('edit-product-name').value = product.name;
+  document.getElementById('edit-product-stock').value = product.stock;
+  document.getElementById('edit-purchase-price').value = product.purchase_price;
+  document.getElementById('edit-sale-price').value = salePrice;
+  document.getElementById('edit-sale-price-vat').value = salePriceVat.toFixed(2);
+
+  document.getElementById('edit-product-modal').classList.remove('hidden');
+}
+
+function closeEditProductModal() {
+  document.getElementById('edit-product-modal').classList.add('hidden');
+}
+
+async function saveProductEdit() {
+  if (!supabaseClient || currentUser.role !== 'admin') return;
+
+  const productId = parseInt(document.getElementById('edit-product-id').value);
+  const newName = document.getElementById('edit-product-name').value.trim();
+  const newStock = parseInt(document.getElementById('edit-product-stock').value);
+  const newPurchasePrice = parseFloat(document.getElementById('edit-purchase-price').value) || 0;
+  const newSalePrice = parseFloat(document.getElementById('edit-sale-price').value) || 0;
+  
+  // Fórmula automática: Precio Venta * 1.19
+  const newSalePriceVat = Number((newSalePrice * 1.19).toFixed(2));
+
+  if (!newName) {
+    alert("⚠️ El nombre del producto no puede estar vacío.");
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('products')
+    .update({
+      name: newName,
+      stock: newStock,
+      purchase_price: newPurchasePrice,
+      sale_price: newSalePrice,
+      sale_price_vat: newSalePriceVat
+    })
+    .eq('id', productId);
+
+  if (error) {
+    alert("Error al actualizar producto: " + error.message);
+    return;
+  }
+
+  closeEditProductModal();
+  await fetchProducts();
+}
+
+// BUSCADOR EN EL MODAL DE MOVIMIENTOS
+function populateProductSelect() {
+  const searchInput = document.getElementById('mov-product-search');
+  const hiddenId = document.getElementById('mov-product-id');
+  const resultsDiv = document.getElementById('mov-product-results');
+
+  if (searchInput) searchInput.value = '';
+  if (hiddenId) hiddenId.value = '';
+  if (resultsDiv) {
+    resultsDiv.classList.add('hidden');
+    resultsDiv.innerHTML = '';
+  }
+}
+
+function filterModalProducts() {
+  const searchInput = document.getElementById('mov-product-search');
+  const hiddenId = document.getElementById('mov-product-id');
+  const resultsDiv = document.getElementById('mov-product-results');
+  const query = searchInput.value.toLowerCase().trim();
+
+  hiddenId.value = '';
+
+  if (!query) {
+    resultsDiv.classList.add('hidden');
+    resultsDiv.innerHTML = '';
+    return;
+  }
+
+  const filtered = products.filter(p => 
+    (p.name && p.name.toLowerCase().includes(query)) || 
+    (p.code && p.code.toLowerCase().includes(query))
+  );
+
+  if (filtered.length === 0) {
+    resultsDiv.innerHTML = `<div class="p-3 text-xs text-slate-500 text-center">No se encontraron productos</div>`;
+  } else {
+    resultsDiv.innerHTML = filtered.map(p => `
+      <div 
+        onclick="selectModalProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.stock})"
+        class="p-3 text-sm text-slate-200 hover:bg-indigo-600 hover:text-white cursor-pointer transition flex justify-between items-center"
+      >
+        <span><strong>${p.code || ''}</strong> - ${p.name}</span>
+        <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300">Stock: ${p.stock}</span>
+      </div>
+    `).join('');
+  }
+
+  resultsDiv.classList.remove('hidden');
+}
+
+function selectModalProduct(id, name, stock) {
+  document.getElementById('mov-product-search').value = `${name} (Stock: ${stock})`;
+  document.getElementById('mov-product-id').value = id;
+  document.getElementById('mov-product-results').classList.add('hidden');
+}
+
+function openMovementModal() {
+  if (currentUser.role === 'viewer') return;
+  populateProductSelect();
+  document.getElementById('movement-modal').classList.remove('hidden');
+}
+
+function openMovementModalWithProduct(productId) {
+  if (currentUser.role === 'viewer') return;
+  openMovementModal();
+  const product = products.find(p => p.id === productId);
+  if (product) {
+    selectModalProduct(product.id, product.name, product.stock);
+  }
+}
+
+function closeMovementModal() {
+  document.getElementById('movement-modal').classList.add('hidden');
+  const resultsDiv = document.getElementById('mov-product-results');
+  if (resultsDiv) resultsDiv.classList.add('hidden');
+}
+
+async function saveMovement() {
+  if (!supabaseClient || currentUser.role === 'viewer') return;
+  const type = document.getElementById('mov-type').value;
+  const productId = parseInt(document.getElementById('mov-product-id').value);
+  const qty = parseInt(document.getElementById('mov-qty').value);
+  const comment = document.getElementById('mov-comment').value.trim();
+
+  if (!productId) {
+    alert("⚠️ Debes buscar y seleccionar un producto de la lista.");
+    return;
+  }
+
+  if (!comment) {
+    alert("⚠️ Debes introducir un comentario u observación obligatoria.");
+    return;
+  }
+
+  const product = products.find(p => p.id === productId);
+  if (!product) return;
+
+  if (type === 'OUT' && product.stock < qty) {
+    alert(`⚠️ Stock insuficiente. Solo hay ${product.stock} unidades disponibles.`);
+    return;
+  }
+
+  const newStock = type === 'IN' ? product.stock + qty : product.stock - qty;
+
+  const { error: updateError } = await supabaseClient
+    .from('products')
+    .update({ stock: newStock })
+    .eq('id', productId);
+
+  if (updateError) {
+    alert("Error al actualizar stock: " + updateError.message);
+    return;
+  }
+
+  await supabaseClient.from('movements').insert([
+    {
+      type: type,
+      product_name: product.name,
+      qty: qty,
+      comment: comment,
+      user_role: currentUser.username.toUpperCase()
+    }
+  ]);
+
+  closeMovementModal();
+  document.getElementById('mov-comment').value = '';
+}
