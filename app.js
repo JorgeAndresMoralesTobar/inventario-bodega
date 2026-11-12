@@ -245,7 +245,14 @@ function subscribeRealtime() {
 // OBTENER DATOS
 async function fetchProducts() {
   if (!supabaseClient) return;
-  const { data, error } = await supabaseClient.from("products").select("*").order("id", { ascending: true });
+  // Supabase entrega máx. 1000 filas por consulta: se piden por páginas hasta traer todos los productos
+  let data = [], error = null;
+  for (let from = 0; from < 100000; from += 1000) {
+    const r = await supabaseClient.from("products").select("*").order("id", { ascending: true }).range(from, from + 999);
+    if (r.error) { error = r.error; break; }
+    data = data.concat(r.data || []);
+    if (!r.data || r.data.length < 1000) break;
+  }
   if (!error && data) {
     products = data.map(p => ({
       ...p,
